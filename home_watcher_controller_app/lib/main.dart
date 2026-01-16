@@ -1,11 +1,14 @@
 // Global Packages
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 //import 'package:video_player/video_player.dart';
 
 // Local Classes
 import 'control_state.dart';
 import 'control_button.dart';
+import 'menu_entry.dart';
+import 'http_comms.dart';
 
 void main() {
   runApp(MyApp());
@@ -32,10 +35,60 @@ class MyApp extends StatelessWidget {
 
 class MyHomePage extends StatelessWidget {
   
+  List<MenuEntry> _getMenus(ControlState appState) {
+    final List<MenuEntry> result = <MenuEntry>[
+      MenuEntry(
+        label: 'Menu',
+        menuChildren: <MenuEntry>[
+          MenuEntry(
+            label: 'Test Server Connection',
+            onPressed: () async {
+              http.Response response;  
+              appState.setState("Testing Server Connection");
+              response = await HttpComms.sendCommandProtected('TestConnectionServer');
+
+              if (response.statusCode == 200)
+              {
+                // Connection successful
+                appState.setState("Server Connection Successful");
+              }
+              else
+              {
+                // Connection failure
+                appState.setState("Server Connection Not Successful");
+              }
+            },
+          ),
+          MenuEntry(
+            label: 'Test Robot Connection',
+            onPressed: () async {
+              http.Response response;  
+              appState.setState("Testing Robot Connection");
+              response = await HttpComms.sendCommandProtected('TestConnectionRobot');
+
+              if (response.statusCode == 200)
+              {
+                // Connection successful
+                appState.setState("Robot Connection Successful");
+              }
+              else
+              {
+                // Connection failure
+                appState.setState("Robot Connection Not Successful");
+              }
+            },
+          ),
+        ],
+      ),
+    ];
+
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
-    var appState = context.watch<ControlState>();
-    var movementStatus = appState.current;
+    ControlState appState = context.watch<ControlState>();
+    String movementStatus = appState.current;
 
     return Scaffold(
       body: Stack(
@@ -58,6 +111,14 @@ class MyHomePage extends StatelessWidget {
             bottom: 10,
             right: 10,
             child: MovementControls(appState: appState),
+          ),
+          Positioned(
+            top: 10,
+            left: 10,
+            child: SafeArea
+            (
+              child: MenuBar(children: MenuEntry.build(_getMenus(appState)))
+            ),
           ),
         ],
       ),

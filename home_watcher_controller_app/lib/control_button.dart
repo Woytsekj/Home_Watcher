@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'http_comms.dart';
 
+import 'http_comms.dart';
 import 'control_state.dart';
 
 enum ButtonDirection
