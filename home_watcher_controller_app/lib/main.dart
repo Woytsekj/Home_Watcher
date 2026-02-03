@@ -10,6 +10,8 @@ import 'control_button.dart';
 import 'menu_entry.dart';
 import 'http_comms.dart';
 
+import 'mqtt_server_client.dart';
+
 void main() {
   runApp(MyApp());
 }
@@ -43,11 +45,14 @@ class MyHomePage extends StatelessWidget {
           MenuEntry(
             label: 'Test Server Connection',
             onPressed: () async {
-              http.Response response;  
+              //http.Response response;  
               appState.setState("Testing Server Connection");
-              response = await HttpComms.sendCommandProtected('TestConnectionServer');
+              //response = await HttpComms.sendCommandProtected('TestConnectionServer');
+              int response;
+              MqttComms comms = MqttComms();
+              response = await comms.main();
 
-              if (response.statusCode == 200)
+              if (response== 200)
               {
                 // Connection successful
                 appState.setState("Server Connection Successful");
@@ -55,7 +60,7 @@ class MyHomePage extends StatelessWidget {
               else
               {
                 // Connection failure
-                appState.setState("Server Connection Not Successful");
+                appState.setState(response.toString());
               }
             },
           ),
