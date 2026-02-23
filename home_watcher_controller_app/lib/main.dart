@@ -16,8 +16,21 @@ void main() {
   runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<StatefulWidget> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+
+  MqttComms mqttComms = MqttComms();
+  @override
+  void initState() {
+    super.initState();
+    mqttComms.setupClient();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +41,7 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlue),
         ),
-        home: MyHomePage(),
+        home: MyHomePage(mqttComms: mqttComms),
       ),
     );
   }
@@ -37,6 +50,13 @@ class MyApp extends StatelessWidget {
 
 class MyHomePage extends StatelessWidget {
   
+  const MyHomePage({
+    super.key,
+    required this.mqttComms,
+  });
+
+  final MqttComms mqttComms;
+
   List<MenuEntry> _getMenus(ControlState appState) {
     final List<MenuEntry> result = <MenuEntry>[
       MenuEntry(
@@ -45,14 +65,13 @@ class MyHomePage extends StatelessWidget {
           MenuEntry(
             label: 'Test Server Connection',
             onPressed: () async {
-              //http.Response response;  
+              
               appState.setState("Testing Server Connection");
+              mqttComms.disconnectFromServer();
               //response = await HttpComms.sendCommandProtected('TestConnectionServer');
-              int response;
-              MqttComms comms = MqttComms();
-              response = await comms.main();
+              int response = await mqttComms.connectToServer();
 
-              if (response== 200)
+              if (response == 0)
               {
                 // Connection successful
                 appState.setState("Server Connection Successful");
@@ -60,7 +79,7 @@ class MyHomePage extends StatelessWidget {
               else
               {
                 // Connection failure
-                appState.setState(response.toString());
+                appState.setState("Server Connection Not Successful");
               }
             },
           ),
@@ -110,12 +129,12 @@ class MyHomePage extends StatelessWidget {
           Positioned(
             bottom: 10,
             left: 10,
-            child: CameraControls(appState: appState),
+            child: CameraControls(appState: appState, mqttComms: mqttComms),
           ),
           Positioned(
             bottom: 10,
             right: 10,
-            child: MovementControls(appState: appState),
+            child: MovementControls(appState: appState, mqttComms: mqttComms),
           ),
           Positioned(
             top: 10,
@@ -135,17 +154,19 @@ class CameraControls extends StatelessWidget {
   const CameraControls({
     super.key,
     required this.appState,
+    required this.mqttComms,
   });
 
   final ControlState appState;
+  final MqttComms mqttComms;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        ControlButton(direction: ButtonDirection.cameraUp, controlState: appState),
-        ControlButton(direction: ButtonDirection.cameraDown, controlState: appState),
+        ControlButton(direction: ButtonDirection.cameraUp, controlState: appState, mqttComms: mqttComms),
+        ControlButton(direction: ButtonDirection.cameraDown, controlState: appState, mqttComms: mqttComms),
       ],
     );
   }
@@ -155,22 +176,24 @@ class MovementControls extends StatelessWidget {
   const MovementControls({
     super.key,
     required this.appState,
+    required this.mqttComms,
   });
 
   final ControlState appState;
+  final MqttComms mqttComms;
  
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        ControlButton(direction: ButtonDirection.forward, controlState: appState),
+        ControlButton(direction: ButtonDirection.forward, controlState: appState, mqttComms: mqttComms),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ControlButton(direction: ButtonDirection.left, controlState: appState),
-            ControlButton(direction: ButtonDirection.backward, controlState: appState),
-            ControlButton(direction: ButtonDirection.right, controlState: appState),
+            ControlButton(direction: ButtonDirection.left, controlState: appState, mqttComms: mqttComms),
+            ControlButton(direction: ButtonDirection.backward, controlState: appState, mqttComms: mqttComms),
+            ControlButton(direction: ButtonDirection.right, controlState: appState, mqttComms: mqttComms),
           ],
         ),
       ],

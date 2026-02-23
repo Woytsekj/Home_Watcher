@@ -29,22 +29,12 @@ import 'package:flutter/services.dart' show rootBundle;
 
 class MqttComms {
   final client = MqttServerClient('ec2-3-149-184-208.us-east-2.compute.amazonaws.com', 'android');
+  final topic = 'robotCommands';
 
   var pongCount = 0; // Pong counter
   var pingCount = 0; // Ping counter
 
-  Future<int> main() async {
-    /// A websocket URL must start with ws:// or wss:// or Dart will throw an exception, consult your websocket MQTT broker
-    /// for details.
-    /// To use websockets add the following lines -:
-    /// client.useWebSocket = true;
-    /// client.port = 80;  ( or whatever your WS port is)
-    /// There is also an alternate websocket implementation for specialist use, see useAlternateWebSocketImplementation
-    /// Note do not set the secure flag if you are using wss, the secure flags is for TCP sockets only.
-    /// You can also supply your own websocket protocol list or disable this feature using the websocketProtocols
-    /// setter, read the API docs for further details here, the vast majority of brokers will support the client default
-    /// list so in most cases you can ignore this.
-
+  Future<int> setupClient() async {
     /// Set logging on if needed, defaults to off
     client.logging(on: false);
 
@@ -113,38 +103,22 @@ class MqttComms {
     print('EXAMPLE::Mosquitto client connecting....');
     client.connectionMessage = connMess;
 
-    /// Connect the client, any errors here are communicated by raising of the appropriate exception. Note
-    /// in some circumstances the broker will just disconnect us, see the spec about this, we however will
-    /// never send malformed messages.
-    try {
-      await client.connect();
-    } on NoConnectionException catch (e) {
-      // Raised by the client when connection fails.
-      print('EXAMPLE::client exception - $e');
-      client.disconnect();
-    } on SocketException catch (e) {
-      // Raised by the socket layer
-      print('EXAMPLE::socket exception - $e');
-      client.disconnect();
+    // Connect to the server
+    int connectionStatus = await connectToServer();
+
+    if (connectionStatus == -1) {
+      return -1;
     }
 
-    /// Check we are connected
-    if (client.connectionStatus!.state == MqttConnectionState.connected) {
-      print('EXAMPLE::Mosquitto client connected');
-    } else {
-      /// Use status here rather than state if you also want the broker return code.
-      print(
-        'EXAMPLE::ERROR Mosquitto client connection failed - disconnecting, status is ${client.connectionStatus}',
-      );
-      client.disconnect();
-      exit(-1);
-    }
+    /// Subscribe to topic ot posit messages to
+    print('EXAMPLE::Subscribing to the robotCommands topic');
 
-    /// Ok, lets try a subscription
-    print('EXAMPLE::Subscribing to the test/lol topic');
-    const topic = 'test/lol'; // Not a wildcard topic
     client.subscribe(topic, MqttQos.atMostOnce);
-
+    // Setup and connection successful
+    return 0;
+  }
+/*
+  Future<int> testing() async {
     /// The client has a change notifier object(see the Observable class) which we then listen to to get
     /// notifications of published updates to each subscribed topic.
     /// In general you should listen here as soon as possible after connecting, you will not receive any
@@ -180,8 +154,7 @@ class MqttComms {
     /// Use the payload builder rather than a raw buffer
     /// Our known topic to publish to
     const pubTopic = 'Dart/Mqtt_client/testtopic';
-    final builder = MqttClientPayloadBuilder();
-    builder.addString('Hello from mqtt_client');
+    
 
     /// Subscribe to it
     print('EXAMPLE::Subscribing to the Dart/Mqtt_client/testtopic topic');
@@ -216,7 +189,7 @@ class MqttComms {
     print('EXAMPLE::Exiting normally');
     return 0;
   }
-
+*/
   /// The subscribed callback
   void onSubscribed(String topic) {
     print('EXAMPLE::Subscription confirmed for topic $topic');
@@ -230,9 +203,8 @@ class MqttComms {
       print('EXAMPLE::OnDisconnected callback is solicited, this is correct');
     } else {
       print(
-        'EXAMPLE::OnDisconnected callback is unsolicited or none, this is incorrect - exiting',
+        'EXAMPLE::OnDisconnected callback is unsolicited or none',
       );
-      exit(-1);
     }
     if (pongCount == 3) {
       print('EXAMPLE:: Pong count is correct');
@@ -266,6 +238,62 @@ class MqttComms {
   void ping() {
     print('EXAMPLE::Ping sent client callback invoked');
     pingCount++;
+  }
+
+  // Publish a robot command to the topic
+  void publishCommand(String commandName)
+  {
+    final builder = MqttClientPayloadBuilder();
+    String message  = commandName;
+    print('Send Command: $commandName');
+    builder.addString(message);
+
+    try
+    {
+      client.publishMessage(topic, MqttQos.exactlyOnce, builder.payload!);
+    }
+    on Exception catch (e)
+    {
+      print("Exception in communication $e");
+    }
+  }
+
+  
+  Future<int> connectToServer() async {
+    /// Connect the client, any errors here are communicated by raising of the appropriate exception. Note
+    /// in some circumstances the broker will just disconnect us, see the spec about this, we however will
+    /// never send malformed messages.
+    try {
+      await client.connect();
+    } on NoConnectionException catch (e) {
+      // Raised by the client when connection fails.
+      print('EXAMPLE::client exception - $e');
+      client.disconnect();
+    } on SocketException catch (e) {
+      // Raised by the socket layer
+      print('EXAMPLE::socket exception - $e');
+      client.disconnect();
+    }
+
+    /// Check we are connected
+    if (client.connectionStatus!.state == MqttConnectionState.connected) {
+      print('EXAMPLE::Mosquitto client connected');
+    } else {
+      /// Use status here rather than state if you also want the broker return code.
+      print(
+        'EXAMPLE::ERROR Mosquitto client connection failed - disconnecting, status is ${client.connectionStatus}',
+      );
+      client.disconnect();
+      return -1;
+    }
+
+    return 0;
+  }
+
+  // Disconnect From the server
+  void disconnectFromServer() 
+  {
+    client.disconnect();
   }
 }
 
