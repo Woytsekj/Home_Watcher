@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'http_comms.dart';
 import 'control_state.dart';
+import 'mqtt_server_client.dart';
 
 enum ButtonDirection
 {
@@ -18,64 +18,67 @@ class ControlButton extends StatelessWidget {
     super.key,
     required this.direction,
     required this.controlState,
+    required this. mqttComms
   });
 
   final ButtonDirection direction;
   final ControlState controlState;
+  final MqttComms mqttComms;
 
   @override
   Widget build(BuildContext context) {
     String buttonText = '';
     String statusText = '';
     String buttonCommand = '';
+    String releaseCommand = 'stop';
 
     switch (direction) {
       case ButtonDirection.forward:
         buttonText = '^';
         statusText = 'Moving Forward';
-        buttonCommand = 'MoveForward';
+        buttonCommand = 'moveForward';
       
       case ButtonDirection.backward:
         buttonText = 'v';
         statusText = 'Moving Backward';
-        buttonCommand = 'MoveBackward';
+        buttonCommand = 'moveBackward';
 
       case ButtonDirection.left:
         buttonText = '<';
         statusText = 'Turning Left';
-        buttonCommand = 'TurnLeft';
+        buttonCommand = 'turnLeft';
 
       case ButtonDirection.right:
         buttonText = '>';
         statusText = 'Turning Right';
-        buttonCommand = 'TurnRight';
+        buttonCommand = 'turnRight';
 
       case ButtonDirection.cameraUp:
         buttonText = '📷 ^';
         statusText = 'Camera Moving Up';
-        buttonCommand = 'CameraUp';
+        buttonCommand = 'cameraUp';
+        releaseCommand = 'stopCamera';
 
       case ButtonDirection.cameraDown:
         buttonText = '📷 v';
         statusText = 'Camera Moving Down';
-        buttonCommand = 'CameraDown';
+        buttonCommand = 'cameraDown';
+        releaseCommand = 'stopCamera';
       }
-
-    final releaseCommand = 'Stop$buttonCommand';
 
     return GestureDetector(
       onLongPressDown: (_) {
-        HttpComms.sendCommandProtected(buttonCommand);
+        mqttComms.publishCommand(buttonCommand);
         controlState.setState(statusText);
       },
 
       onLongPressEnd: (_) {
-        HttpComms.sendCommandProtected(releaseCommand);
+        mqttComms.publishCommand(releaseCommand);
         controlState.stopState();
       },
 
       onLongPressCancel: () {
-        HttpComms.sendCommandProtected(releaseCommand);
+        mqttComms.publishCommand(releaseCommand);
         controlState.stopState();
       },
 
