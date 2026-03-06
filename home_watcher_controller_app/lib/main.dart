@@ -9,6 +9,7 @@ import 'control_state.dart';
 import 'control_button.dart';
 import 'menu_entry.dart';
 import 'http_comms.dart';
+import 'src/p2p_call.dart';
 
 import 'mqtt_server_client.dart';
 
@@ -117,6 +118,7 @@ class MyHomePage extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
+          CallSample(),
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
