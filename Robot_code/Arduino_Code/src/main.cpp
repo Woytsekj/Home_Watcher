@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <SoftPWM.h>
 #include "motors.h"
+#include "servo.h"
 
 // LED stuff (not really important)
 #define PIN_B 11
@@ -10,6 +11,15 @@
 // IR stuff
 #define IR_RIGHT 7
 #define IR_LEFT 8
+
+// Servo stuff
+#define SERVO_PIN 6
+#define SERVO_MIN_ANGLE 30
+#define SERVO_MAX_ANGLE 150
+int currentAngle = 90; // Start at the middle position
+int angleStep = 10; // Step size for each command
+Servo servo(SERVO_PIN);
+
 
 
 // Battery stuff
@@ -41,6 +51,16 @@ void doLEDOff() {
   SoftPWMSet(PIN_G, 0);
   SoftPWMSet(PIN_B, 0);
 }
+void doServoUp() {
+  currentAngle += angleStep;
+  currentAngle = constrain(currentAngle, SERVO_MIN_ANGLE, SERVO_MAX_ANGLE);
+  servo.write(currentAngle);
+}
+void doServoDown() {
+  currentAngle -= angleStep;
+  currentAngle = constrain(currentAngle, SERVO_MIN_ANGLE, SERVO_MAX_ANGLE);
+  servo.write(currentAngle);
+}
 
 Command commandList[] = {
   {"moveForward", doForward},
@@ -49,7 +69,9 @@ Command commandList[] = {
   {"turnRight", doTurnRight},
   {"stop", doStop},
   {"LED_ON", doLEDOn},
-  {"LED_OFF", doLEDOff}
+  {"LED_OFF", doLEDOff},
+  {"SERVO_UP", doServoUp},
+  {"SERVO_DOWN", doServoDown}
 };
 
 const int commandCount = sizeof(commandList) / sizeof(Command);
@@ -78,7 +100,7 @@ uint8_t batteryGetPercentage() {
 
 void setup() {
   // Start Serial at 115200 baud to make sure it can talk to the ESP32
-  // REMINDER: Unplug the ESP32 when uploading this code!
+  // REMINDER: Unplug the ESP32 when uploading this code
   Serial.begin(115200);
   delay(2000); // Wait for the ESP32 from being a sleepy boy
   pinMode(BATTERY_PIN, INPUT);
@@ -93,6 +115,9 @@ void setup() {
   SoftPWMSetFadeTime(PIN_B, 100, 100); // 100ms fade time for Blue
   SoftPWMSetFadeTime(PIN_R, 100, 100); // 100ms fade time for Red
   SoftPWMSetFadeTime(PIN_G, 100, 100); // 100ms fade time for Green
+
+  servo.attach();
+  servo.write(currentAngle); // Start at the middle position
 }
 
 void loop() {
@@ -106,20 +131,6 @@ void loop() {
     Serial.print("BATT:");
     Serial.println(pct);
   }
-
-  // if (currentMillis - lastIRTime >= IRInterval) {
-  //   lastIRTime = currentMillis;
-  //     int rightIR = digitalRead(IR_RIGHT);
-  //     int leftIR = digitalRead(IR_LEFT);
-
-  //     if (rightIR == 0 && leftIR == 1) {
-  //       Serial.println("wallRIGHT");
-  //     } else if (rightIR == 1 && leftIR == 0) {
-  //       Serial.println("wallLEFT");
-  //     } else if (rightIR == 0 && leftIR == 0) {
-  //       Serial.println("wallFRONT");
-  //     }
-  // }
 
   int rightIR = digitalRead(IR_RIGHT);
   int leftIR = digitalRead(IR_LEFT);
@@ -147,8 +158,7 @@ void loop() {
     command.trim();
 
     if (command.indexOf(',') > 0) {
-      // This is an RGB command, so we can skip the dictionary
-      // and directly parse the values.
+      // This is an RGB command, so we need to parse the values.
       int firstComma = command.indexOf(',');
       int secondComma = command.indexOf(',', firstComma + 1);
 
@@ -164,6 +174,7 @@ void loop() {
       return; // Exit early since we've handled the RGB command
     }
 
+    // Go through the command list and execute the matching command
     bool matchFound = false;
     for (int i = 0; i < commandCount; i++) {
       if (command == commandList[i].name) {
