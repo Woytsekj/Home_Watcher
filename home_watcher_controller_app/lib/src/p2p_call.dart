@@ -6,14 +6,15 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 class CallSample extends StatefulWidget {
   static String tag = 'call_sample';
-  final String host = 'https://demo.cloudwebrtc.com:8443';
+  final String host = 'stun.l.google.com';
+  final int port = 19302;
   CallSample();
 
   @override
-  _CallSampleState createState() => _CallSampleState();
+  CallSampleState createState() => CallSampleState();
 }
 
-class _CallSampleState extends State<CallSample> {
+class CallSampleState extends State<CallSample> {
   Signaling? _signaling;
   List<dynamic> _peers = [];
   String? _selfId;
@@ -21,11 +22,10 @@ class _CallSampleState extends State<CallSample> {
   RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
   bool _inCalling = false;
   Session? _session;
-  DesktopCapturerSource? selected_source_;
   bool _waitAccept = false;
 
   // ignore: unused_element
-  _CallSampleState();
+  CallSampleState();
 
   @override
   initState() {
@@ -36,7 +36,9 @@ class _CallSampleState extends State<CallSample> {
 
   initRenderers() async {
     await _localRenderer.initialize();
+    print('P2PCall::local renderer initialized');
     await _remoteRenderer.initialize();
+    print('P2PCall::remote renderer initialized');
   }
 
   @override
@@ -48,33 +50,30 @@ class _CallSampleState extends State<CallSample> {
   }
 
   void _connect(BuildContext context) async {
-    _signaling ??= Signaling(widget.host, context)..connect();
+    _signaling ??= Signaling(widget.host, widget.port, context)..connect();
     _signaling?.onSignalingStateChange = (SignalingState state) {
       switch (state) {
-        case SignalingState.ConnectionClosed:
-        case SignalingState.ConnectionError:
-        case SignalingState.ConnectionOpen:
-          break;
+        case SignalingState.connectionClosed:
+          print('P2PCall::Connection closed');
+        case SignalingState.connectionError:
+          print('P2PCall::Connection Error');
+        case SignalingState.connectionOpen:
+        print('P2PCall::Connection Open');
       }
     };
 
     _signaling?.onCallStateChange = (Session session, CallState state) async {
       switch (state) {
-        case CallState.CallStateNew:
+        case CallState.callStateNew:
           setState(() {
             _session = session;
           });
-        case CallState.CallStateRinging:
-          bool? accept = await _showAcceptDialog();
-          if (accept!) {
-            _accept();
-            setState(() {
-              _inCalling = true;
-            });
-          } else {
-            _reject();
-          }
-        case CallState.CallStateBye:
+        case CallState.callStateRinging:
+          _accept();
+          setState(() {
+            _inCalling = true;
+          });
+        case CallState.callStateBye:
           if (_waitAccept) {
             print('peer reject');
             _waitAccept = false;
@@ -86,10 +85,10 @@ class _CallSampleState extends State<CallSample> {
             _inCalling = false;
             _session = null;
           });
-        case CallState.CallStateInvite:
+        case CallState.callStateInvite:
           _waitAccept = true;
           _showInvateDialog();
-        case CallState.CallStateConnected:
+        case CallState.callStateConnected:
           if (_waitAccept) {
             _waitAccept = false;
             Navigator.of(context).pop(false);
@@ -104,6 +103,7 @@ class _CallSampleState extends State<CallSample> {
       setState(() {
         _selfId = event['self'];
         _peers = event['peers'];
+        _invitePeer(context, _peers[0]);
       });
     });
 
@@ -120,34 +120,6 @@ class _CallSampleState extends State<CallSample> {
     _signaling?.onRemoveRemoteStream = ((_, stream) {
       _remoteRenderer.srcObject = null;
     });
-  }
-
-  Future<bool?> _showAcceptDialog() {
-    return showDialog<bool?>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text("title"),
-          content: Text("accept?"),
-          actions: <Widget>[
-            MaterialButton(
-              child: Text(
-                'Reject',
-                style: TextStyle(color: Colors.red),
-              ),
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            MaterialButton(
-              child: Text(
-                'Accept',
-                style: TextStyle(color: Colors.green),
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<bool?> _showInvateDialog() {
@@ -171,9 +143,9 @@ class _CallSampleState extends State<CallSample> {
     );
   }
 
-  _invitePeer(BuildContext context, String peerId, bool useScreen) async {
+  _invitePeer(BuildContext context, String peerId) async {
     if (_signaling != null && peerId != _selfId) {
-      _signaling?.invite(peerId, 'video', useScreen);
+      _signaling?.invite(peerId, 'video');
     }
   }
 
@@ -183,20 +155,10 @@ class _CallSampleState extends State<CallSample> {
     }
   }
 
-  _reject() {
-    if (_session != null) {
-      _signaling?.reject(_session!.sid);
-    }
-  }
-
   _hangUp() {
     if (_session != null) {
       _signaling?.bye(_session!.sid);
     }
-  }
-
-  _switchCamera() {
-    _signaling?.switchCamera();
   }
 
   Future<void> selectScreenSourceDialog(BuildContext context) async {
@@ -234,122 +196,39 @@ class _CallSampleState extends State<CallSample> {
     if (screenStream != null) _signaling?.switchToScreenSharing(screenStream);
   }
 
-  _muteMic() {
-    _signaling?.muteMic();
-  }
-
-  _buildRow(context, peer) {
-    var self = (peer['id'] == _selfId);
-    return ListBody(children: <Widget>[
-      ListTile(
-        title: Text(self
-            ? peer['name'] + ', ID: ${peer['id']} ' + ' [Your self]'
-            : peer['name'] + ', ID: ${peer['id']} '),
-        onTap: null,
-        trailing: SizedBox(
-            width: 100.0,
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[
-                  IconButton(
-                    icon: Icon(self ? Icons.close : Icons.videocam,
-                        color: self ? Colors.grey : Colors.black),
-                    onPressed: () => _invitePeer(context, peer['id'], false),
-                    tooltip: 'Video calling',
-                  ),
-                  IconButton(
-                    icon: Icon(self ? Icons.close : Icons.screen_share,
-                        color: self ? Colors.grey : Colors.black),
-                    onPressed: () => _invitePeer(context, peer['id'], true),
-                    tooltip: 'Screen sharing',
-                  )
-                ])),
-        subtitle: Text('[$peer["user_agent"]]'),
-      ),
-      Divider()
-    ]);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('P2P Call Sample${_selfId != null ? ' [Your ID ($_selfId)] ' : ''}'),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: null,
-            tooltip: 'setup',
-          ),
-        ],
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _inCalling
-          ? SizedBox(
-              width: 240.0,
-              child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    FloatingActionButton(
-                      child: const Icon(Icons.switch_camera),
-                      tooltip: 'Camera',
-                      onPressed: _switchCamera,
-                    ),
-                    FloatingActionButton(
-                      child: const Icon(Icons.desktop_mac),
-                      tooltip: 'Screen Sharing',
-                      onPressed: () => selectScreenSourceDialog(context),
-                    ),
-                    FloatingActionButton(
-                      onPressed: _hangUp,
-                      tooltip: 'Hangup',
-                      child: Icon(Icons.call_end),
-                      backgroundColor: Colors.pink,
-                    ),
-                    FloatingActionButton(
-                      child: const Icon(Icons.mic_off),
-                      tooltip: 'Mute Mic',
-                      onPressed: _muteMic,
-                    )
-                  ]))
-          : null,
-      body: _inCalling
-          ? OrientationBuilder(builder: (context, orientation) {
-              return Container(
-                child: Stack(children: <Widget>[
-                  Positioned(
-                      left: 0.0,
-                      right: 0.0,
-                      top: 0.0,
-                      bottom: 0.0,
-                      child: Container(
-                        margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
-                        width: MediaQuery.of(context).size.width,
-                        height: MediaQuery.of(context).size.height,
-                        child: RTCVideoView(_remoteRenderer),
-                        decoration: BoxDecoration(color: Colors.black54),
-                      )),
-                  Positioned(
-                    left: 20.0,
-                    top: 20.0,
-                    child: Container(
-                      width: orientation == Orientation.portrait ? 90.0 : 120.0,
-                      height:
-                          orientation == Orientation.portrait ? 120.0 : 90.0,
-                      child: RTCVideoView(_localRenderer, mirror: true),
-                      decoration: BoxDecoration(color: Colors.black54),
-                    ),
-                  ),
-                ]),
-              );
-            })
-          : ListView.builder(
-              shrinkWrap: true,
-              padding: const EdgeInsets.all(0.0),
-              itemCount: (_peers != null ? _peers.length : 0),
-              itemBuilder: (context, i) {
-                return _buildRow(context, _peers[i]);
-              }),
+      body: OrientationBuilder(builder: (context, orientation) {
+        return Stack(children: <Widget>[
+            Positioned(
+                left: 0.0,
+                right: 0.0,
+                top: 0.0,
+                bottom: 0.0,
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height,
+                  decoration: BoxDecoration(color: Colors.black54),
+                  child: RTCVideoView(_remoteRenderer),
+                )),
+            Positioned(
+              left: 20.0,
+              top: 20.0,
+              child: Container(
+                width: orientation == Orientation.portrait ? 90.0 : 120.0,
+                height:
+                    orientation == Orientation.portrait ? 120.0 : 90.0,
+                decoration: BoxDecoration(color: Colors.black54),
+                child: RTCVideoView(_localRenderer, mirror: true),
+              ),
+            ),
+          ]);
+      })
     );
   }
 }

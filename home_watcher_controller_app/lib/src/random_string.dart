@@ -16,13 +16,15 @@
 ///     print(randomAlpha(5)); // random sequence of 5 alpha characters i.e. aRztC
 ///     print(randomAlphaNumeric(10)); // random sequence of 10 alpha numeric i.e. aRztC1y32B
 /// }
+library;
+
 
 import 'dart:math';
 
-const ASCII_START = 33;
-const ASCII_END = 126;
-const NUMERIC_START = 48;
-const NUMERIC_END = 57;
+const asciiStart = 33;
+const asciiEnd = 126;
+const numericStart = 48;
+const numbericEnd = 57;
 
 /// Generates a random integer where [from] <= [to].
 int randomBetween(int from, int to) {
@@ -34,11 +36,11 @@ int randomBetween(int from, int to) {
 /// Generates a random string of [length] with characters
 /// between ascii [from] to [to].
 /// Defaults to characters of ascii '!' to '~'.
-String randomString(int length, {int from = ASCII_START, int to = ASCII_END}) {
+String randomString(int length, {int from = asciiStart, int to = asciiEnd}) {
   return String.fromCharCodes(
       List.generate(length, (index) => randomBetween(from, to)));
 }
 
 /// Generates a random string of [length] with only numeric characters.
 String randomNumeric(int length) =>
-    randomString(length, from: NUMERIC_START, to: NUMERIC_END);
+    randomString(length, from: numericStart, to: numbericEnd);

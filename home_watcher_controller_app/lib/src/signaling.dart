@@ -7,25 +7,25 @@ import 'screen_select_dialog.dart';
 import 'random_string.dart';
 import 'device_info.dart';
 import 'websocket.dart';
-import 'turn.dart';
+//import 'turn.dart';
 
 enum SignalingState {
-  ConnectionOpen,
-  ConnectionClosed,
-  ConnectionError,
+  connectionOpen,
+  connectionClosed,
+  connectionError,
 }
 
 enum CallState {
-  CallStateNew,
-  CallStateRinging,
-  CallStateInvite,
-  CallStateConnected,
-  CallStateBye,
+  callStateNew,
+  callStateRinging,
+  callStateInvite,
+  callStateConnected,
+  callStateBye,
 }
 
 enum VideoSource {
-  Camera,
-  Screen,
+  camera,
+  screen,
 }
 
 class Session {
@@ -38,21 +38,21 @@ class Session {
 }
 
 class Signaling {
-  Signaling(this._host, this._context);
+  Signaling(this._host, this._port, this._context);
 
   JsonEncoder _encoder = JsonEncoder();
   JsonDecoder _decoder = JsonDecoder();
   String _selfId = randomNumeric(6);
   SimpleWebSocket? _socket;
   BuildContext? _context;
-  var _host;
-  int _port = 8086;
-  var _turnCredential;
+  String _host;
+  int _port;
+  //var _turnCredential;
   Map<String, Session> _sessions = {};
   MediaStream? _localStream;
   List<MediaStream> _remoteStreams = <MediaStream>[];
   List<RTCRtpSender> _senders = <RTCRtpSender>[];
-  VideoSource _videoSource = VideoSource.Camera;
+  VideoSource _videoSource = VideoSource.camera;
 
   Function(SignalingState state)? onSignalingStateChange;
   Function(Session session, CallState state)? onCallStateChange;
@@ -102,13 +102,13 @@ class Signaling {
 
   void switchCamera() {
     if (_localStream != null) {
-      if (_videoSource != VideoSource.Camera) {
-        _senders.forEach((sender) {
+      if (_videoSource != VideoSource.camera) {
+        for (var sender in _senders) {
           if (sender.track!.kind == 'video') {
             sender.replaceTrack(_localStream!.getVideoTracks()[0]);
           }
-        });
-        _videoSource = VideoSource.Camera;
+        }
+        _videoSource = VideoSource.camera;
         onLocalStream?.call(_localStream!);
       } else {
         Helper.switchCamera(_localStream!.getVideoTracks()[0]);
@@ -117,38 +117,28 @@ class Signaling {
   }
 
   void switchToScreenSharing(MediaStream stream) {
-    if (_localStream != null && _videoSource != VideoSource.Screen) {
-      _senders.forEach((sender) {
+    if (_localStream != null && _videoSource != VideoSource.screen) {
+      for (var sender in _senders) {
         if (sender.track!.kind == 'video') {
           sender.replaceTrack(stream.getVideoTracks()[0]);
         }
-      });
+      }
       onLocalStream?.call(stream);
-      _videoSource = VideoSource.Screen;
+      _videoSource = VideoSource.screen;
     }
   }
 
-  void muteMic() {
-    if (_localStream != null) {
-      bool enabled = _localStream!.getAudioTracks()[0].enabled;
-      _localStream!.getAudioTracks()[0].enabled = !enabled;
-    }
-  }
-
-  void invite(String peerId, String media, bool useScreen) async {
+  void invite(String peerId, String media) async {
     var sessionId = '$_selfId-$peerId';
     Session session = await _createSession(null,
         peerId: peerId,
         sessionId: sessionId,
         media: media,
-        screenSharing: useScreen);
+        screenSharing: false);
     _sessions[sessionId] = session;
-    if (media == 'data') {
-      _createDataChannel(session);
-    }
     _createOffer(session, media);
-    onCallStateChange?.call(session, CallState.CallStateNew);
-    onCallStateChange?.call(session, CallState.CallStateInvite);
+    onCallStateChange?.call(session, CallState.callStateNew);
+    onCallStateChange?.call(session, CallState.callStateInvite);
   }
 
   void bye(String sessionId) {
@@ -216,8 +206,8 @@ class Signaling {
             });
             newSession.remoteCandidates.clear();
           }
-          onCallStateChange?.call(newSession, CallState.CallStateNew);
-          onCallStateChange?.call(newSession, CallState.CallStateRinging);
+          onCallStateChange?.call(newSession, CallState.callStateNew);
+          onCallStateChange?.call(newSession, CallState.callStateRinging);
         }
       case 'answer':
         {
@@ -226,7 +216,7 @@ class Signaling {
           var session = _sessions[sessionId];
           session?.pc?.setRemoteDescription(
               RTCSessionDescription(description['sdp'], description['type']));
-          onCallStateChange?.call(session!, CallState.CallStateConnected);
+          onCallStateChange?.call(session!, CallState.callStateConnected);
         }
       case 'candidate':
         {
@@ -259,7 +249,7 @@ class Signaling {
           print('bye: $sessionId');
           var session = _sessions.remove(sessionId);
           if (session != null) {
-            onCallStateChange?.call(session, CallState.CallStateBye);
+            onCallStateChange?.call(session, CallState.callStateBye);
             _closeSession(session);
           }
         }
@@ -278,6 +268,7 @@ class Signaling {
 
     print('connect to $url');
 
+    /*
     if (_turnCredential == null) {
       try {
         _turnCredential = await getTurnCredential(_host, _port);
@@ -297,12 +288,15 @@ class Signaling {
             },
           ]
         };
-      } catch (e) {}
+      } catch (e) {
+        print('signaling::Could not get TURN credentials: $e');
+      }
     }
+    */
 
     _socket?.onOpen = () {
       print('onOpen');
-      onSignalingStateChange?.call(SignalingState.ConnectionOpen);
+      onSignalingStateChange?.call(SignalingState.connectionOpen);
       _send('new', {
         'name': DeviceInfo.label,
         'id': _selfId,
@@ -316,8 +310,8 @@ class Signaling {
     };
 
     _socket?.onClose = (int? code, String? reason) {
-      print('Closed by server [$code => $reason]!');
-      onSignalingStateChange?.call(SignalingState.ConnectionClosed);
+      print('Signaling::Closed by server [$code => $reason]!');
+      onSignalingStateChange?.call(SignalingState.connectionClosed);
     };
 
     await _socket?.connect();
@@ -403,55 +397,9 @@ class Signaling {
           });
       }
 
-      // Unified-Plan: Simuclast
-      /*
-      await pc.addTransceiver(
-        track: _localStream.getAudioTracks()[0],
-        init: RTCRtpTransceiverInit(
-            direction: TransceiverDirection.SendOnly, streams: [_localStream]),
-      );
-
-      await pc.addTransceiver(
-        track: _localStream.getVideoTracks()[0],
-        init: RTCRtpTransceiverInit(
-            direction: TransceiverDirection.SendOnly,
-            streams: [
-              _localStream
-            ],
-            sendEncodings: [
-              RTCRtpEncoding(rid: 'f', active: true),
-              RTCRtpEncoding(
-                rid: 'h',
-                active: true,
-                scaleResolutionDownBy: 2.0,
-                maxBitrate: 150000,
-              ),
-              RTCRtpEncoding(
-                rid: 'q',
-                active: true,
-                scaleResolutionDownBy: 4.0,
-                maxBitrate: 100000,
-              ),
-            ]),
-      );*/
-      /*
-        var sender = pc.getSenders().find(s => s.track.kind == "video");
-        var parameters = sender.getParameters();
-        if(!parameters)
-          parameters = {};
-        parameters.encodings = [
-          { rid: "h", active: true, maxBitrate: 900000 },
-          { rid: "m", active: true, maxBitrate: 300000, scaleResolutionDownBy: 2 },
-          { rid: "l", active: true, maxBitrate: 100000, scaleResolutionDownBy: 4 }
-        ];
-        sender.setParameters(parameters);
-      */
+      
     }
     pc.onIceCandidate = (candidate) async {
-      if (candidate == null) {
-        print('onIceCandidate: complete!');
-        return;
-      }
       // This delay is needed to allow enough time to try an ICE candidate
       // before skipping to the next one. 1 second is just an heuristic value
       // and should be thoroughly tested in your own environment.
@@ -478,30 +426,8 @@ class Signaling {
       });
     };
 
-    pc.onDataChannel = (channel) {
-      _addDataChannel(newSession, channel);
-    };
-
     newSession.pc = pc;
     return newSession;
-  }
-
-  void _addDataChannel(Session session, RTCDataChannel channel) {
-    channel.onDataChannelState = (e) {};
-    channel.onMessage = (RTCDataChannelMessage data) {
-      onDataChannelMessage?.call(session, channel, data);
-    };
-    session.dc = channel;
-    onDataChannel?.call(session, channel);
-  }
-
-  Future<void> _createDataChannel(Session session,
-      {label = 'fileTransfer'}) async {
-    RTCDataChannelInit dataChannelDict = RTCDataChannelInit()
-      ..maxRetransmits = 30;
-    RTCDataChannel channel =
-        await session.pc!.createDataChannel(label, dataChannelDict);
-    _addDataChannel(session, channel);
   }
 
   Future<void> _createOffer(Session session, String media) async {
@@ -545,7 +471,7 @@ class Signaling {
   }
 
   _send(event, data) {
-    var request = Map();
+    var request = {};
     request["type"] = event;
     request["data"] = data;
     _socket?.send(_encoder.convert(request));
@@ -575,7 +501,7 @@ class Signaling {
     });
     if (session != null) {
       _closeSession(session);
-      onCallStateChange?.call(session, CallState.CallStateBye);
+      onCallStateChange?.call(session, CallState.callStateBye);
     }
   }
 
@@ -589,6 +515,6 @@ class Signaling {
     await session.pc?.close();
     await session.dc?.close();
     _senders.clear();
-    _videoSource = VideoSource.Camera;
+    _videoSource = VideoSource.camera;
   }
 }
