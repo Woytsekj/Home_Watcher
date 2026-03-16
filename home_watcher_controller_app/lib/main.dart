@@ -10,8 +10,7 @@ import 'control_button.dart';
 import 'menu_entry.dart';
 import 'http_comms.dart';
 import 'src/p2p_call.dart';
-
-import 'mqtt_server_client.dart';
+import 'src/mqtt_server_client.dart';
 
 void main() {
   runApp(MyApp());
@@ -119,7 +118,7 @@ class MyHomePage extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          CallSample(),
+          CallSample(mqttComms),
           //Image(image: AssetImage('pictures/DoggoPic.jpg')),
           Center(
             child: Column(

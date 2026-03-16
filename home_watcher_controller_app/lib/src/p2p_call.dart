@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'dart:core';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+
 import 'screen_select_dialog.dart';
 import 'signaling.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'mqtt_server_client.dart';
 
 class CallSample extends StatefulWidget {
   static String tag = 'call_sample';
   final String host = 'stun.l.google.com';
   final int port = 19302;
-  CallSample();
+  MqttComms mqttComms;
+  CallSample(this.mqttComms);
 
   @override
-  CallSampleState createState() => CallSampleState();
+  CallSampleState createState() => CallSampleState(this.mqttComms);
 }
 
 class CallSampleState extends State<CallSample> {
@@ -23,9 +26,10 @@ class CallSampleState extends State<CallSample> {
   bool _inCalling = false;
   Session? _session;
   bool _waitAccept = false;
+  MqttComms mqttComms;
 
   // ignore: unused_element
-  CallSampleState();
+  CallSampleState(this.mqttComms);
 
   @override
   initState() {
@@ -50,17 +54,7 @@ class CallSampleState extends State<CallSample> {
   }
 
   void _connect(BuildContext context) async {
-    _signaling ??= Signaling(widget.host, widget.port, context)..connect();
-    _signaling?.onSignalingStateChange = (SignalingState state) {
-      switch (state) {
-        case SignalingState.connectionClosed:
-          print('P2PCall::Connection closed');
-        case SignalingState.connectionError:
-          print('P2PCall::Connection Error');
-        case SignalingState.connectionOpen:
-        print('P2PCall::Connection Open');
-      }
-    };
+    _signaling ??= Signaling(widget.host, widget.port, context, this.mqttComms)..connect();
 
     _signaling?.onCallStateChange = (Session session, CallState state) async {
       switch (state) {

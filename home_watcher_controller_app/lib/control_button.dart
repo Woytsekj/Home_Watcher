@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'control_state.dart';
-import 'mqtt_server_client.dart';
+import 'src/mqtt_server_client.dart';
 
 enum ButtonDirection
 {

@@ -75,8 +75,10 @@ class MqttComms {
     client.pingCallback = ping;
 
     // Set the port
-    client.port =
-      8883; // Secure port number for mosquitto, no client certificate required
+    client.port = 8883; // Secure port number for mosquitto, no client certificate required
+
+    // Set MQTT to auto reconnect
+    client.autoReconnect = true;
 
     // Security context
     // Create the security context
@@ -114,11 +116,7 @@ class MqttComms {
     print('MQTT::Subscribing to the robotCommands topic');
 
     client.subscribe(topic, MqttQos.atMostOnce);
-    // Setup and connection successful
-    return 0;
-  }
-/*
-  Future<int> testing() async {
+
     /// The client has a change notifier object(see the Observable class) which we then listen to to get
     /// notifications of published updates to each subscribed topic.
     /// In general you should listen here as soon as possible after connecting, you will not receive any
@@ -149,6 +147,13 @@ class MqttComms {
         'EXAMPLE::Published notification:: topic is ${message.variableHeader!.topicName}, with Qos ${message.header!.qos}',
       );
     });
+
+    // Setup and connection successful
+    return 0;
+  }
+/*
+  Future<int> testing() async {
+    
 
     /// Lets publish to our topic
     /// Use the payload builder rather than a raw buffer

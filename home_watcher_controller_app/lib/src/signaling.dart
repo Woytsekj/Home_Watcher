@@ -6,7 +6,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'screen_select_dialog.dart';
 import 'random_string.dart';
 import 'device_info.dart';
-import 'websocket.dart';
+import 'mqtt_server_client.dart';
 //import 'turn.dart';
 
 enum SignalingState {
@@ -38,15 +38,15 @@ class Session {
 }
 
 class Signaling {
-  Signaling(this._host, this._port, this._context);
+  Signaling(this._host, this._port, this._context, this.mqttComms);
 
   JsonEncoder _encoder = JsonEncoder();
   JsonDecoder _decoder = JsonDecoder();
   String _selfId = randomNumeric(6);
-  SimpleWebSocket? _socket;
   BuildContext? _context;
   String _host;
   int _port;
+  MqttComms mqttComms;
   //var _turnCredential;
   Map<String, Session> _sessions = {};
   MediaStream? _localStream;
@@ -54,7 +54,6 @@ class Signaling {
   List<RTCRtpSender> _senders = <RTCRtpSender>[];
   VideoSource _videoSource = VideoSource.camera;
 
-  Function(SignalingState state)? onSignalingStateChange;
   Function(Session session, CallState state)? onCallStateChange;
   Function(MediaStream stream)? onLocalStream;
   Function(Session session, MediaStream stream)? onAddRemoteStream;
@@ -97,7 +96,6 @@ class Signaling {
 
   close() async {
     await _cleanSessions();
-    _socket?.close();
   }
 
   void switchCamera() {
@@ -264,7 +262,6 @@ class Signaling {
 
   Future<void> connect() async {
     var url = 'https://$_host:$_port/ws';
-    _socket = SimpleWebSocket(url);
 
     print('connect to $url');
 
@@ -294,9 +291,9 @@ class Signaling {
     }
     */
 
+    /*
     _socket?.onOpen = () {
       print('onOpen');
-      onSignalingStateChange?.call(SignalingState.connectionOpen);
       _send('new', {
         'name': DeviceInfo.label,
         'id': _selfId,
@@ -309,12 +306,8 @@ class Signaling {
       onMessage(_decoder.convert(message));
     };
 
-    _socket?.onClose = (int? code, String? reason) {
-      print('Signaling::Closed by server [$code => $reason]!');
-      onSignalingStateChange?.call(SignalingState.connectionClosed);
-    };
-
     await _socket?.connect();
+    */
   }
 
   Future<MediaStream> createStream(String media, bool userScreen,
@@ -474,7 +467,7 @@ class Signaling {
     var request = {};
     request["type"] = event;
     request["data"] = data;
-    _socket?.send(_encoder.convert(request));
+    mqttComms.publishCommand(_encoder.convert(request));
   }
 
   Future<void> _cleanSessions() async {
