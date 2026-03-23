@@ -33,7 +33,6 @@ class Session {
   String pid;
   String sid;
   RTCPeerConnection? pc;
-  RTCDataChannel? dc;
   List<RTCIceCandidate> remoteCandidates = [];
 }
 
@@ -59,9 +58,6 @@ class Signaling {
   Function(Session session, MediaStream stream)? onAddRemoteStream;
   Function(Session session, MediaStream stream)? onRemoveRemoteStream;
   Function(dynamic event)? onPeersUpdate;
-  Function(Session session, RTCDataChannel dc, RTCDataChannelMessage data)?
-      onDataChannelMessage;
-  Function(Session session, RTCDataChannel dc)? onDataChannel;
 
   String get sdpSemantics => 'unified-plan';
 
@@ -98,6 +94,7 @@ class Signaling {
     await _cleanSessions();
   }
 
+  /*
   void switchCamera() {
     if (_localStream != null) {
       if (_videoSource != VideoSource.camera) {
@@ -125,6 +122,7 @@ class Signaling {
       _videoSource = VideoSource.screen;
     }
   }
+  */
 
   void invite(String peerId, String media) async {
     var sessionId = '$_selfId-$peerId';
@@ -260,6 +258,7 @@ class Signaling {
     }
   }
 
+  /*
   Future<void> connect() async {
     var url = 'https://$_host:$_port/ws';
 
@@ -309,6 +308,7 @@ class Signaling {
     await _socket?.connect();
     */
   }
+  */
 
   Future<MediaStream> createStream(String media, bool userScreen,
       {BuildContext? context}) async {
@@ -389,8 +389,6 @@ class Signaling {
             _senders.add(await pc.addTrack(track, _localStream!));
           });
       }
-
-      
     }
     pc.onIceCandidate = (candidate) async {
       // This delay is needed to allow enough time to try an ICE candidate
@@ -480,7 +478,6 @@ class Signaling {
     }
     _sessions.forEach((key, sess) async {
       await sess.pc?.close();
-      await sess.dc?.close();
     });
     _sessions.clear();
   }
@@ -506,7 +503,6 @@ class Signaling {
     _localStream = null;
 
     await session.pc?.close();
-    await session.dc?.close();
     _senders.clear();
     _videoSource = VideoSource.camera;
   }

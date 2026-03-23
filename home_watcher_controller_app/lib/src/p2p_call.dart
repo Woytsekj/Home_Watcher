@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:core';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-import 'screen_select_dialog.dart';
 import 'signaling.dart';
 import 'mqtt_server_client.dart';
 
@@ -14,7 +13,7 @@ class CallSample extends StatefulWidget {
   CallSample(this.mqttComms);
 
   @override
-  CallSampleState createState() => CallSampleState(this.mqttComms);
+  CallSampleState createState() => CallSampleState(mqttComms);
 }
 
 class CallSampleState extends State<CallSample> {
@@ -54,7 +53,7 @@ class CallSampleState extends State<CallSample> {
   }
 
   void _connect(BuildContext context) async {
-    _signaling ??= Signaling(widget.host, widget.port, context, this.mqttComms)..connect();
+    _signaling = Signaling(widget.host, widget.port, context, mqttComms);
 
     _signaling?.onCallStateChange = (Session session, CallState state) async {
       switch (state) {
@@ -114,6 +113,8 @@ class CallSampleState extends State<CallSample> {
     _signaling?.onRemoveRemoteStream = ((_, stream) {
       _remoteRenderer.srcObject = null;
     });
+
+    // Start Requesting Dialog
   }
 
   Future<bool?> _showInvateDialog() {
@@ -153,41 +154,6 @@ class CallSampleState extends State<CallSample> {
     if (_session != null) {
       _signaling?.bye(_session!.sid);
     }
-  }
-
-  Future<void> selectScreenSourceDialog(BuildContext context) async {
-    MediaStream? screenStream;
-    if (WebRTC.platformIsDesktop) {
-      final source = await showDialog<DesktopCapturerSource>(
-        context: context,
-        builder: (context) => ScreenSelectDialog(),
-      );
-      if (source != null) {
-        try {
-          var stream =
-              await navigator.mediaDevices.getDisplayMedia(<String, dynamic>{
-            'video': {
-              'deviceId': {'exact': source.id},
-              'mandatory': {'frameRate': 30.0}
-            }
-          });
-          stream.getVideoTracks()[0].onEnded = () {
-            print(
-                'By adding a listener on onEnded you can: 1) catch stop video sharing on Web');
-          };
-          screenStream = stream;
-        } catch (e) {
-          print(e);
-        }
-      }
-    } else if (WebRTC.platformIsWeb) {
-      screenStream =
-          await navigator.mediaDevices.getDisplayMedia(<String, dynamic>{
-        'audio': false,
-        'video': true,
-      });
-    }
-    if (screenStream != null) _signaling?.switchToScreenSharing(screenStream);
   }
 
   @override
