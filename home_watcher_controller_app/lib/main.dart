@@ -1,5 +1,6 @@
 // Global Packages
 import 'package:flutter/material.dart';
+import 'package:home_watcher_controller_app/src/signaling.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
@@ -26,10 +27,13 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
 
   MqttComms mqttComms = MqttComms();
+  late Signaling signaling;
+
   @override
   void initState() {
     super.initState();
     mqttComms.setupClient();
+    signaling = Signaling(mqttComms);
   }
 
   @override
@@ -41,7 +45,7 @@ class _MyAppState extends State<MyApp> {
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlue),
         ),
-        home: MyHomePage(mqttComms: mqttComms),
+        home: MyHomePage(mqttComms: mqttComms, signaling: signaling),
         debugShowCheckedModeBanner: false,
       ),
     );
@@ -54,9 +58,11 @@ class MyHomePage extends StatelessWidget {
   const MyHomePage({
     super.key,
     required this.mqttComms,
+    required this.signaling,
   });
 
   final MqttComms mqttComms;
+  final Signaling signaling;
 
   List<MenuEntry> _getMenus(ControlState appState) {
     final List<MenuEntry> result = <MenuEntry>[
@@ -103,6 +109,14 @@ class MyHomePage extends StatelessWidget {
               }
             },
           ),
+          MenuEntry(
+            label: 'Send WebRTC Offer',
+            onPressed: () async {
+              
+              appState.setState("Sending WebRTC Offer");
+              signaling.invite("1");
+            },
+          ),
         ],
       ),
     ];
@@ -118,7 +132,7 @@ class MyHomePage extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          CallSample(mqttComms),
+          CallSample(signaling),
           //Image(image: AssetImage('pictures/DoggoPic.jpg')),
           Center(
             child: Column(

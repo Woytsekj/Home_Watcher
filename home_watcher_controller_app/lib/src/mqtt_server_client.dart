@@ -31,8 +31,13 @@ class MqttComms {
   final client = MqttServerClient('ec2-3-149-184-208.us-east-2.compute.amazonaws.com', 'android');
   final topic = 'robotCommands';
 
+  final robotToControllerTopic = 'robotWebRTC/tx';
+  final controllerToRobotTopic = 'robotWebRTC/rx';
+
   var pongCount = 0; // Pong counter
   var pingCount = 0; // Ping counter
+
+  Function (String message)? onWebRTCMessageReceived;
 
   Future<int> setupClient() async {
     /// Set logging on if needed, defaults to off
@@ -114,8 +119,9 @@ class MqttComms {
 
     /// Subscribe to topic ot posit messages to
     print('MQTT::Subscribing to the robotCommands topic');
-
     client.subscribe(topic, MqttQos.atMostOnce);
+    client.subscribe(robotToControllerTopic, MqttQos.atMostOnce);
+    client.subscribe(controllerToRobotTopic, MqttQos.atMostOnce);
 
     /// The client has a change notifier object(see the Observable class) which we then listen to to get
     /// notifications of published updates to each subscribed topic.
@@ -136,21 +142,34 @@ class MqttComms {
       print(
         'EXAMPLE::Change notification:: topic is <${c[0].topic}>, payload is <-- $pt -->',
       );
-      print('');
+
+      if (c[0].topic == robotToControllerTopic)
+      {
+        // WebRTC message received from the robot, pass to the callback
+        if (onWebRTCMessageReceived != null)
+        {
+          onWebRTCMessageReceived!(pt);
+        }
+      }
     });
 
-    /// If needed you can listen for published messages that have completed the publishing
-    /// handshake which is Qos dependant. Any message received on this stream has completed its
-    /// publishing handshake with the broker.
-    client.published!.listen((MqttPublishMessage message) {
-      print(
-        'EXAMPLE::Published notification:: topic is ${message.variableHeader!.topicName}, with Qos ${message.header!.qos}',
-      );
-    });
+
 
     // Setup and connection successful
     return 0;
   }
+
+  /// If needed you can listen for published messages that have completed the publishing
+  /// handshake which is Qos dependant. Any message received on this stream has completed its
+  /// publishing handshake with the broker.
+  /*
+  client.published!.listen((MqttPublishMessage message) {
+    print(
+      'EXAMPLE::Published notification:: topic is ${message.variableHeader!.topicName}, with Qos ${message.header!.qos}',
+    );
+  });
+  */
+
 /*
   Future<int> testing() async {
     
@@ -259,7 +278,25 @@ class MqttComms {
     }
     on Exception catch (e)
     {
-      print("MQTT::Exception in communication $e");
+      print("MQTT::Exception in command communication $e");
+    }
+  }
+
+
+  // Publish a message to the topic
+  void publishMessage(String topic, String message)
+  {
+    final builder = MqttClientPayloadBuilder();
+    print('MQTT::Send Message: $message to topic: $topic');
+    builder.addString(message);
+
+    try
+    {
+      client.publishMessage(topic, MqttQos.exactlyOnce, builder.payload!);
+    }
+    on Exception catch (e)
+    {
+      print("MQTT::Exception in webRTC communication $e");
     }
   }
 
