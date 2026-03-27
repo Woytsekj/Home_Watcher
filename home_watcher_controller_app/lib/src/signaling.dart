@@ -114,7 +114,9 @@ class Signaling {
   }
 
   void onMessage(String message) async {
+    print('Signaling::onMessage => message: $message');
     Map<String, dynamic> mapData = _decoder.convert(message);
+    
 
     switch (mapData['type']) {
       case 'peers':
@@ -129,16 +131,35 @@ class Signaling {
         }
       case 'answer':
         {
-          var session = _sessions['1'];
+          var session = _sessions['$_selfId-1'];
           session?.pc?.setRemoteDescription(RTCSessionDescription(mapData['sdp'], 'answer'));
           onCallStateChange?.call(session!, CallState.callStateConnected);
         }
+      case 'candidate':
+        {
+          // var candidateMap = mapData['candidate'];
+          var session = _sessions['$_selfId-1'];
+          // RTCIceCandidate candidate = RTCIceCandidate(candidateMap['candidate'], candidateMap['sdpMid'], candidateMap['sdpMLineIndex']);
+          RTCIceCandidate candidate = RTCIceCandidate(mapData['candidate'], null, null);
+          if (session != null) {
+            if (session.pc != null) {
+              await session.pc?.addCandidate(candidate);
+            } else {
+              session.remoteCandidates.add(candidate);
+            }
+          } else {
+            _sessions['$_selfId-1'] = Session(pid: '1', sid: '$_selfId-1')
+              ..remoteCandidates.add(candidate);
+          }
+        }
       case 'keepalive':
         {
-          print('keepalive response!');
+          print('Signaling::onMessage => keepalive response!');
         }
       default:
-        break;
+        {
+          print('Signaling::onMessage => Unknown message type: ${mapData['type']}');
+        }
     }
   }
 
@@ -187,9 +208,6 @@ class Signaling {
         'media': media,
       });
       */
-
-      RTCSessionDescription a =
-          await session.pc!.createAnswer(_dcConstraints);
 
       _send('offer', 'sdp', s.sdp);
     } catch (e) {

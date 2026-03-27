@@ -13,6 +13,7 @@ class ImageChangerState extends State<ImageChanger> {
 
   // Function to update image data
   void updateImage(Uint8List newImageData) {
+    print('ImageChanger::updateImage');
     setState(() {
       _imageData = newImageData;
     });

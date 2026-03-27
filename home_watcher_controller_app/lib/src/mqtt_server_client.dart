@@ -140,14 +140,16 @@ class MqttComms {
       /// for a while.
       /// The payload is a byte buffer, this will be specific to the topic
       print(
-        'EXAMPLE::Change notification:: topic is <${c[0].topic}>, payload is <-- $pt -->',
+        'MQTT::Change notification:: topic is <${c[0].topic}>, payload is <-- $pt -->',
       );
 
       if (c[0].topic == robotToControllerTopic)
       {
+        print('MQTT::Message received on robotToControllerTopic: $pt');
         // WebRTC message received from the robot, pass to the callback
         if (onWebRTCMessageReceived != null)
         {
+          print('MQTT::Passing WebRTC message to callback');
           onWebRTCMessageReceived!(pt);
         }
       }

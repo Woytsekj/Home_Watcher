@@ -102,7 +102,9 @@ class CallSampleState extends State<CallSample> {
 
     // Start Requesting Dialog
     print('P2PCall::Invite Robot to Data Stream');
-    signaling?.invite("1");
+    Future.delayed(Duration(seconds: 5), () {
+      signaling?.invite("1");
+    });
   }
 
   invitePeer(BuildContext context, String peerId) async {
