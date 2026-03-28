@@ -47,7 +47,6 @@ class Signaling {
   //var _turnCredential;
   Map<String, Session> _sessions = {};
   List<MediaStream> _remoteStreams = <MediaStream>[];
-  List<RTCRtpSender> _senders = <RTCRtpSender>[];
 
   Function(Session session, CallState state)? onCallStateChange;
   Function(Session session, MediaStream stream)? onAddRemoteStream;
@@ -61,14 +60,16 @@ class Signaling {
   Map<String, dynamic> _iceServers = {
     'iceServers': [
       {'url': 'stun:ec2-3-149-184-208.us-east-2.compute.amazonaws.com:3478'},
-      /*
-       * turn server configuration example.
       {
-        'url': 'turn:123.45.67.89:3478',
-        'username': 'change_to_real_user',
-        'credential': 'change_to_real_secret'
+        'url': 'turn:ec2-3-149-184-208.us-east-2.compute.amazonaws.com:3478?transport=udp',
+        'username': 'android',
+        'credential': '',
       },
-      */
+      {
+        'url': 'turns:ec2-3-149-184-208.us-east-2.compute.amazonaws.com:5349?transport=tcp',
+        'username': 'android',
+        'credential': '',
+      },
     ]
   };
 
@@ -170,7 +171,12 @@ class Signaling {
     required bool screenSharing,
   }) async {
     var newSession = session ?? Session(sid: sessionId, pid: peerId);
-    print(_iceServers);
+
+    // Get Cert for TURN
+    _iceServers['iceServers'][1]['credential'] = mqttComms.certString;
+    _iceServers['iceServers'][2]['credential'] = mqttComms.certString;
+
+
     RTCPeerConnection pc = await createPeerConnection({
       ..._iceServers,
       ...{'sdpSemantics': sdpSemantics}
@@ -248,7 +254,8 @@ class Signaling {
   }
 
   void _addDataChannel(Session session, RTCDataChannel channel) {
-    channel.onDataChannelState = (e) {};
+    print('Signaling::_addDataChannel => sessionId: ${session.sid}, channelLabel: ${channel.label}');
+    channel.onDataChannelState = (e) {print('Signaling::_addDataChannel => Data channel state Changed: $e');};
     channel.onMessage = (RTCDataChannelMessage data) {
       onDataChannelMessage?.call(session, channel, data);
     };
@@ -257,6 +264,7 @@ class Signaling {
   }
   
   Future<void> _createDataChannel(Session session, {label = 'fileTransfer'}) async {
+    print('Signaling::_createDataChannel => sessionId: ${session.sid}, label: $label');
     RTCDataChannelInit dataChannelDict = RTCDataChannelInit()..maxRetransmits = 30;
     RTCDataChannel channel = await session.pc!.createDataChannel(label, dataChannelDict);
     _addDataChannel(session, channel);

@@ -34,6 +34,8 @@ class MqttComms {
   final robotToControllerTopic = 'robotWebRTC/tx';
   final controllerToRobotTopic = 'robotWebRTC/rx';
 
+  String certString = '';
+
   var pongCount = 0; // Pong counter
   var pingCount = 0; // Ping counter
 
@@ -90,6 +92,7 @@ class MqttComms {
     final context = SecurityContext.defaultContext;
     // Load and parse Cert
     final ByteData homeWatcherByteData = await rootBundle.load('certs/HomeWatcher.crt');
+    certString = homeWatcherByteData.toString();
     final homeWatcherCrt = homeWatcherByteData.buffer.asUint8List();
     // Set Cert in context
     context.setTrustedCertificatesBytes(homeWatcherCrt);
@@ -145,7 +148,7 @@ class MqttComms {
 
       if (c[0].topic == robotToControllerTopic)
       {
-        print('MQTT::Message received on robotToControllerTopic: $pt');
+        print('MQTT::Message received on robotToControllerTopic');
         // WebRTC message received from the robot, pass to the callback
         if (onWebRTCMessageReceived != null)
         {

@@ -20,7 +20,6 @@ class CallSampleState extends State<CallSample> {
   Signaling? signaling;
   List<dynamic> _peers = [];
   String? _selfId;
-  bool _inCalling = false;
   Session? _session;
   bool _waitAccept = false;
   RTCDataChannel? _dataChannel;
@@ -44,6 +43,7 @@ class CallSampleState extends State<CallSample> {
 
   void _connect(BuildContext context) async {
     signaling?.onCallStateChange = (Session session, CallState state) async {
+      print('P2PCall::onCallStateChange => sessionId: ${session.sid}, state: $state');
       switch (state) {
         case CallState.callStateNew:
           setState(() {
@@ -51,17 +51,13 @@ class CallSampleState extends State<CallSample> {
           });
         case CallState.callStateRinging:
           _accept();
-          setState(() {
-            _inCalling = true;
-          });
+          setState(() {});
         case CallState.callStateBye:
           if (_waitAccept) {
             print('peer reject');
             _waitAccept = false;
-            Navigator.of(context).pop(false);
           }
           setState(() {
-            _inCalling = false;
             _session = null;
           });
         case CallState.callStateInvite:
@@ -69,11 +65,8 @@ class CallSampleState extends State<CallSample> {
         case CallState.callStateConnected:
           if (_waitAccept) {
             _waitAccept = false;
-            Navigator.of(context).pop(false);
           }
-          setState(() {
-            _inCalling = true;
-          });
+          setState(() {});
       }
     };
 
