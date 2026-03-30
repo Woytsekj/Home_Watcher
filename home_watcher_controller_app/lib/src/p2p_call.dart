@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'dart:core';
+import 'dart:async';
 
 import 'signaling.dart';
 import 'jpeg_video.dart';
@@ -22,23 +23,37 @@ class CallSampleState extends State<CallSample> {
   String? _selfId;
   Session? _session;
   bool _waitAccept = false;
+  bool _dataRecieved = false;
+  Timer? _disconnectChecker;
   RTCDataChannel? _dataChannel;
   final GlobalKey<ImageChangerState> imageChangerKey = GlobalKey<ImageChangerState>();
   ImageChanger get video => ImageChanger(key: imageChangerKey);
 
-  // ignore: unused_element
   CallSampleState(this.signaling);
 
   @override
   initState() {
     super.initState();
     _connect(context);
+    _disconnectChecker = Timer.periodic(const Duration(seconds: 20), checkConnection);
   }
 
   @override
   deactivate() {
     super.deactivate();
     signaling?.close();
+  }
+
+  // If data is not recieved for 20 seconds, assume connection is lost and try to reconnect
+  void checkConnection(Timer _)
+  {
+    if (_dataRecieved == false)
+    {
+      // Timeout
+      print('P2PCall::Connection Timeout');
+      signaling?.invite("1");
+    }
+    _dataRecieved = false;
   }
 
   void _connect(BuildContext context) async {
@@ -81,10 +96,11 @@ class CallSampleState extends State<CallSample> {
     signaling?.onDataChannelMessage = (_, dc, RTCDataChannelMessage data) {
       setState(() {
         if (data.isBinary) {
-          print('P2PCall::Got binary Data [${data.binary}]');
+          //print('P2PCall::Got binary Data');
             imageChangerKey.currentState?.updateImage(data.binary);
+            _dataRecieved = true;
         } else {
-          print('P2PCall::Got String Data [${data.text}]');
+          print('P2PCall::Got String Data');
 
         }});
     };
@@ -114,26 +130,14 @@ class CallSampleState extends State<CallSample> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('P2P Call Sample${_selfId != null ? ' [Your ID ($_selfId)] ' : ''}'),
-      ),
-      body: OrientationBuilder(builder: (context, orientation) {
-        return Stack(children: <Widget>[
-            Positioned(
-                left: 0.0,
-                right: 0.0,
-                top: 0.0,
-                bottom: 0.0,
-                child: Container(
+    return OrientationBuilder(builder: (context, orientation) {
+        return Container(
                   margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
                   width: MediaQuery.of(context).size.width,
                   height: MediaQuery.of(context).size.height,
                   decoration: BoxDecoration(color: Colors.black54),
                   child: video,
-                ))
-          ]);
-      })
-    );
+                );
+      });
   }
 }

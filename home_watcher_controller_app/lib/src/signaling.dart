@@ -63,13 +63,15 @@ class Signaling {
       {
         'url': 'turn:ec2-3-149-184-208.us-east-2.compute.amazonaws.com:3478?transport=udp',
         'username': 'android',
-        'credential': '',
+        'credential': 'ENEDBAD',
       },
+      /*
       {
         'url': 'turns:ec2-3-149-184-208.us-east-2.compute.amazonaws.com:5349?transport=tcp',
         'username': 'android',
-        'credential': '',
+        'credential': 'ENEDBAD',
       },
+      */
     ]
   };
 
@@ -171,11 +173,6 @@ class Signaling {
     required bool screenSharing,
   }) async {
     var newSession = session ?? Session(sid: sessionId, pid: peerId);
-
-    // Get Cert for TURN
-    _iceServers['iceServers'][1]['credential'] = mqttComms.certString;
-    _iceServers['iceServers'][2]['credential'] = mqttComms.certString;
-
 
     RTCPeerConnection pc = await createPeerConnection({
       ..._iceServers,

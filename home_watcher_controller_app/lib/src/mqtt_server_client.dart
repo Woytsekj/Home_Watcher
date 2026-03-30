@@ -92,7 +92,7 @@ class MqttComms {
     final context = SecurityContext.defaultContext;
     // Load and parse Cert
     final ByteData homeWatcherByteData = await rootBundle.load('certs/HomeWatcher.crt');
-    certString = homeWatcherByteData.toString();
+    //certString = await rootBundle.loadString('certs/HomeWatcher.crt');
     final homeWatcherCrt = homeWatcherByteData.buffer.asUint8List();
     // Set Cert in context
     context.setTrustedCertificatesBytes(homeWatcherCrt);
