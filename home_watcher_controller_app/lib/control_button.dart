@@ -18,7 +18,7 @@ class ControlButton extends StatelessWidget {
     super.key,
     required this.direction,
     required this.controlState,
-    required this. mqttComms
+    required this.mqttComms
   });
 
   final ButtonDirection direction;

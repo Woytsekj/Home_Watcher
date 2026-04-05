@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 class ImageChanger extends StatefulWidget {
-  ImageChanger({super.key,}); 
+  ImageChanger({super.key}); 
 
 
   @override

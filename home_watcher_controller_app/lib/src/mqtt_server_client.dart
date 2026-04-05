@@ -29,7 +29,7 @@ import 'package:flutter/services.dart' show rootBundle;
 
 class MqttComms {
   final client = MqttServerClient('ec2-3-149-184-208.us-east-2.compute.amazonaws.com', 'android');
-  final topic = 'robotCommands';
+  final robotCommandsTopic = 'robotCommands';
 
   final robotToControllerTopic = 'robotWebRTC/tx';
   final controllerToRobotTopic = 'robotWebRTC/rx';
@@ -40,6 +40,7 @@ class MqttComms {
   var pingCount = 0; // Ping counter
 
   Function (String message)? onWebRTCMessageReceived;
+  Function (String message)? onBatteryLevelReceived;
 
   Future<int> setupClient() async {
     /// Set logging on if needed, defaults to off
@@ -122,7 +123,7 @@ class MqttComms {
 
     /// Subscribe to topic ot posit messages to
     print('MQTT::Subscribing to the robotCommands topic');
-    client.subscribe(topic, MqttQos.atMostOnce);
+    client.subscribe(robotCommandsTopic, MqttQos.atMostOnce);
     client.subscribe(robotToControllerTopic, MqttQos.atMostOnce);
     client.subscribe(controllerToRobotTopic, MqttQos.atMostOnce);
 
@@ -154,6 +155,17 @@ class MqttComms {
         {
           print('MQTT::Passing WebRTC message to callback');
           onWebRTCMessageReceived!(pt);
+        }
+      } else if (c[0].topic == robotCommandsTopic)
+      {
+        if (pt.startsWith(RegExp(r"^[0-9]*$"))) {
+          print('MQTT::Battery Level Message Received');
+          // Battery level message received from the robot, pass to the callback
+          if (onBatteryLevelReceived != null)
+          {
+            print('MQTT::Passing Battery Level message to callback');
+            onBatteryLevelReceived!(pt);
+          }
         }
       }
     });
@@ -279,7 +291,7 @@ class MqttComms {
 
     try
     {
-      client.publishMessage(topic, MqttQos.exactlyOnce, builder.payload!);
+      client.publishMessage(robotCommandsTopic, MqttQos.exactlyOnce, builder.payload!);
     }
     on Exception catch (e)
     {

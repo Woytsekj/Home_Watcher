@@ -1,15 +1,14 @@
 // Global Packages
 import 'package:flutter/material.dart';
+import 'package:home_watcher_controller_app/battery_widget.dart';
 import 'package:home_watcher_controller_app/src/signaling.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
-import 'dart:math' as math;
+
 
 // Local Classes
 import 'control_state.dart';
 import 'control_button.dart';
 import 'menu_entry.dart';
-import 'http_comms.dart';
 import 'src/p2p_call.dart';
 import 'src/mqtt_server_client.dart';
 
@@ -91,30 +90,19 @@ class MyHomePage extends StatelessWidget {
             },
           ),
           MenuEntry(
-            label: 'Test Robot Connection',
-            onPressed: () async {
-              http.Response response;  
-              appState.setState("Testing Robot Connection");
-              response = await HttpComms.sendCommandProtected('TestConnectionRobot');
-
-              if (response.statusCode == 200)
-              {
-                // Connection successful
-                appState.setState("Robot Connection Successful");
-              }
-              else
-              {
-                // Connection failure
-                appState.setState("Robot Connection Not Successful");
-              }
-            },
-          ),
-          MenuEntry(
             label: 'Send WebRTC Offer',
             onPressed: () async {
               
               appState.setState("Sending WebRTC Offer");
               signaling.invite("1");
+            },
+          ),
+          MenuEntry(
+            label: 'Request Battery Level',
+            onPressed: () async {
+              
+              appState.setState("Requesting Battery Level");
+              mqttComms.publishCommand('requestBatteryLevel');
             },
           ),
         ],
@@ -165,10 +153,7 @@ class MyHomePage extends StatelessWidget {
             right: 10,
             child: SafeArea
             (
-              child: Transform.rotate(
-                angle: 90 * math.pi / 180,
-                child: Icon(Icons.battery_full, color: Colors.blue, size: 50)
-                )
+              child: BatteryWidget(mqttComms: mqttComms)
             ),
           ),
         ],
