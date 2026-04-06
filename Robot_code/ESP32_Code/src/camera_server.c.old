@@ -1,0 +1,272 @@
+#include "camera_server.h"
+#include "esp_camera.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+
+// Correct headers for the Espressif WebRTC library
+#include "esp_peer.h"
+#include "esp_peer_default.h"
+
+static const char *TAG = "WEBRTC_SERVER";
+
+// Freenove ESP32-WROVER-CAM Pin Configuration
+#define CAM_PIN_PWDN -1  
+#define CAM_PIN_RESET -1 
+#define CAM_PIN_XCLK 21
+#define CAM_PIN_SIOD 26
+#define CAM_PIN_SIOC 27
+#define CAM_PIN_D7 35 
+#define CAM_PIN_D6 34 
+#define CAM_PIN_D5 39 
+#define CAM_PIN_D4 36 
+#define CAM_PIN_D3 19 
+#define CAM_PIN_D2 18 
+#define CAM_PIN_D1 5  
+#define CAM_PIN_D0 4  
+#define CAM_PIN_VSYNC 25 
+#define CAM_PIN_HREF 23  
+#define CAM_PIN_PCLK 22  
+
+// --- 1. The Embedded HTML Test Client ---
+static const char* index_html = 
+    "<!DOCTYPE html><html><head><title>Galaxy RVR WebRTC</title></head><body>"
+    "<h2>Galaxy RVR WebRTC Stream</h2>"
+    "<video id=\"video\" autoplay playsinline controls style=\"max-width: 100%; background: black;\"></video><br>"
+    "<button id=\"start\">Start Stream</button>"
+    "<script>"
+    "document.getElementById('start').onclick = async () => {"
+    "  const pc = new RTCPeerConnection();"
+    "  pc.ontrack = e => document.getElementById('video').srcObject = e.streams[0];"
+    "  pc.addTransceiver('video', { direction: 'recvonly' });"
+    "  const offer = await pc.createOffer();"
+    "  await pc.setLocalDescription(offer);"
+    "  const res = await fetch('/offer', { "
+    "      method: 'POST', "
+    "      headers: {'Content-Type': 'application/json'}, "
+    "      body: JSON.stringify(offer) "
+    "  });"
+    "  const text = await res.text();"
+    "  try {"
+    "      await pc.setRemoteDescription(JSON.parse(text));"
+    "  } catch(e) {"
+    "      await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: text }));"
+    "  }"
+    "};"
+    "</script></body></html>";
+
+// Global variables for WebRTC Event Handling
+static esp_peer_handle_t current_peer = NULL;
+static bool peer_connected = false;
+static char generated_sdp_answer[4096] = {0};
+
+static EventGroupHandle_t webrtc_event_group;
+#define SDP_ANSWER_READY_BIT BIT0
+
+// --- 2. WebRTC Callbacks ---
+
+static int on_peer_state(esp_peer_state_t state, void *ctx) {
+    if (state == ESP_PEER_STATE_CONNECTED) {
+        ESP_LOGI(TAG, "WebRTC Peer Connected!");
+        peer_connected = true;
+    } else if (state == ESP_PEER_STATE_DISCONNECTED) {
+        ESP_LOGI(TAG, "WebRTC Peer Disconnected!");
+        peer_connected = false;
+    }
+    return 0; 
+}
+
+static int on_peer_msg(esp_peer_msg_t *msg, void *ctx) {
+    if (msg != NULL && msg->data != NULL && msg->size > 0) {
+        ESP_LOGI(TAG, "SUCCESS! on_peer_msg fired! Generated %d bytes.", msg->size);
+        
+        snprintf(generated_sdp_answer, sizeof(generated_sdp_answer), "%.*s", msg->size, (char*)msg->data);
+        
+        if (webrtc_event_group != NULL) {
+            xEventGroupSetBits(webrtc_event_group, SDP_ANSWER_READY_BIT);
+        }
+    } else {
+        ESP_LOGE(TAG, "on_peer_msg fired, but data was empty!");
+    }
+    return 0;
+}
+
+// --- 3a. WebRTC Main Loop Task (THE ENGINE) ---
+static void webrtc_main_loop_task(void *pvParameters) {
+    esp_peer_handle_t peer = (esp_peer_handle_t)pvParameters;
+    esp_peer_main_loop(peer);
+    vTaskDelete(NULL);
+}
+
+// --- 3b. WebRTC Video Streaming Task ---
+static void webrtc_video_task(void *pvParameters) {
+    while (true) {
+        if (peer_connected && current_peer != NULL) {
+            camera_fb_t *fb = esp_camera_fb_get();
+            if (fb) {
+                esp_peer_video_frame_t frame = {0}; 
+                frame.data = fb->buf;
+                frame.size = fb->len;
+                
+                esp_peer_send_video(current_peer, &frame);
+                esp_camera_fb_return(fb);
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(30)); 
+    }
+}
+
+// --- 4. HTTP GET Handler ---
+static esp_err_t index_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "text/html");
+    return httpd_resp_send(req, index_html, HTTPD_RESP_USE_STRLEN);
+}
+
+// --- 5. HTTP POST Handler ---
+static esp_err_t offer_handler(httpd_req_t *req) {
+    char offer_sdp[4096] = {0}; 
+    int total_len = req->content_len;
+    
+    if (total_len >= sizeof(offer_sdp)) {
+        ESP_LOGE(TAG, "SDP Offer is too large! (%d bytes)", total_len);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    int received = 0;
+    while (received < total_len) {
+        int ret = httpd_req_recv(req, offer_sdp + received, total_len - received);
+        if (ret <= 0) {
+            ESP_LOGE(TAG, "Failed to receive complete SDP offer");
+            return ESP_FAIL;
+        }
+        received += ret;
+    }
+    
+    offer_sdp[received] = '\0';
+    ESP_LOGI(TAG, "Received complete WebRTC Offer: %d bytes. Generating Answer...", received);
+
+    if (webrtc_event_group == NULL) {
+        webrtc_event_group = xEventGroupCreate();
+    }
+    xEventGroupClearBits(webrtc_event_group, SDP_ANSWER_READY_BIT);
+
+    if (current_peer == NULL) {
+        esp_peer_cfg_t peer_config = {
+            .on_state = on_peer_state,
+            .on_msg = on_peer_msg,
+            .video_info = {
+                .codec = ESP_PEER_VIDEO_CODEC_MJPEG,
+                .width = 640,
+                .height = 480,
+                .fps = 30
+            }
+        };
+        
+        esp_peer_open(&peer_config, esp_peer_get_default_impl(), &current_peer);
+        
+        xTaskCreatePinnedToCore(webrtc_main_loop_task, "webrtc_loop", 16384, current_peer, 5, NULL, 0);
+        xTaskCreatePinnedToCore(webrtc_video_task, "webrtc_video", 8192, NULL, 5, NULL, 1);
+        
+        // [FIX 2] Give FreeRTOS time to physically start the tasks and queues
+        vTaskDelay(pdMS_TO_TICKS(100)); 
+    }
+
+    // [FIX 1] Open the connection state machine FIRST
+    esp_peer_new_connection(current_peer);
+    
+    // Optional: give the state machine a tick to register
+    vTaskDelay(pdMS_TO_TICKS(20));
+
+    // [FIX 3] Include the null terminator to prevent parser truncation
+    esp_peer_msg_t offer_msg = {0}; 
+    offer_msg.data = (uint8_t *)offer_sdp;
+    offer_msg.size = strlen(offer_sdp) + 1; 
+    
+    // NOW pass the offer
+    esp_peer_send_msg(current_peer, &offer_msg);
+
+    // INCREASED TIMEOUT to 30 Seconds
+    EventBits_t bits = xEventGroupWaitBits(webrtc_event_group, SDP_ANSWER_READY_BIT, pdTRUE, pdFALSE, pdMS_TO_TICKS(30000));
+    
+    if (bits & SDP_ANSWER_READY_BIT) {
+        ESP_LOGI(TAG, "Sending WebRTC Answer back to Browser!");
+        httpd_resp_set_type(req, "text/plain");
+        return httpd_resp_send(req, generated_sdp_answer, HTTPD_RESP_USE_STRLEN);
+    } else {
+        ESP_LOGE(TAG, "Timeout waiting for SDP Answer generation");
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+}
+
+// --- 6. Camera Initialization ---
+esp_err_t init_camera(void) {
+    camera_config_t config;
+    config.ledc_channel = LEDC_CHANNEL_0;
+    config.ledc_timer = LEDC_TIMER_0;
+    config.pin_d0 = CAM_PIN_D0;
+    config.pin_d1 = CAM_PIN_D1;
+    config.pin_d2 = CAM_PIN_D2;
+    config.pin_d3 = CAM_PIN_D3;
+    config.pin_d4 = CAM_PIN_D4;
+    config.pin_d5 = CAM_PIN_D5;
+    config.pin_d6 = CAM_PIN_D6;
+    config.pin_d7 = CAM_PIN_D7;
+    config.pin_xclk = CAM_PIN_XCLK;
+    config.pin_pclk = CAM_PIN_PCLK;
+    config.pin_vsync = CAM_PIN_VSYNC;
+    config.pin_href = CAM_PIN_HREF;
+    config.pin_sccb_sda = CAM_PIN_SIOD;
+    config.pin_sccb_scl = CAM_PIN_SIOC;
+    config.pin_pwdn = CAM_PIN_PWDN;
+    config.pin_reset = CAM_PIN_RESET;
+    config.xclk_freq_hz = 100000000;
+    config.pixel_format = PIXFORMAT_JPEG; 
+    
+    config.frame_size = FRAMESIZE_QVGA;
+    config.jpeg_quality = 15; 
+    config.fb_count = 2; 
+    config.grab_mode = CAMERA_GRAB_LATEST;
+
+    esp_err_t err = esp_camera_init(&config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Camera init failed with error 0x%x", err);
+        return err;
+    }
+    return ESP_OK;
+}
+
+// --- 7. Start HTTP Server ---
+httpd_handle_t start_camera_server(void) {
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.server_port = 80;
+    config.stack_size = 8192; 
+    
+    // INCREASED HTTP Socket Timeouts to match the heavy math
+    config.recv_wait_timeout = 30;
+    config.send_wait_timeout = 30;
+
+    httpd_uri_t index_uri = {
+        .uri       = "/",
+        .method    = HTTP_GET,
+        .handler   = index_handler,
+        .user_ctx  = NULL
+    };
+
+    httpd_uri_t offer_uri = {
+        .uri       = "/offer",
+        .method    = HTTP_POST,
+        .handler   = offer_handler,
+        .user_ctx  = NULL
+    };
+
+    httpd_handle_t server = NULL;
+    ESP_LOGI(TAG, "Starting WebRTC signaling server on port: '%d'", config.server_port);
+    if (httpd_start(&server, &config) == ESP_OK) {
+        httpd_register_uri_handler(server, &index_uri);
+        httpd_register_uri_handler(server, &offer_uri);
+    }
+    return server;
+}

@@ -1,0 +1,21 @@
+#ifndef CAMERA_SERVER_H
+#define CAMERA_SERVER_H
+
+#include "esp_err.h"
+#include "esp_http_server.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Initializes the camera hardware
+esp_err_t init_camera(void);
+
+// Starts the HTTP server for the video stream
+httpd_handle_t start_camera_server(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // CAMERA_SERVER_H

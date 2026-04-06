@@ -1,0 +1,20 @@
+dependencies:
+  espressif/esp_image_effects:
+    require: public
+    version: ~1.0.0
+  espressif/esp_video_codec: ~0.5.2
+  espressif/gmf_core:
+    require: public
+    version: ^0.8
+description: Espressif GMF Video Elements Module
+documentation: https://github.com/espressif/esp-gmf/blob/main/elements/gmf_video/README.md
+issues: https://github.com/espressif/esp-gmf/issues
+repository: git://github.com/espressif/esp-gmf.git
+repository_info:
+  commit_sha: 02d35e11040e3980228c46cf3de1f2432dbfe4ff
+  path: ./elements/gmf_video
+tags:
+- gmf
+- video
+url: https://github.com/espressif/esp-gmf/tree/main/elements/gmf_video
+version: 0.8.0

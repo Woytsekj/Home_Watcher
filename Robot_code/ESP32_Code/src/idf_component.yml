@@ -1,0 +1,4 @@
+dependencies:
+  espressif/esp32-camera: "*"
+  espressif/esp_peer: "*"
+  espressif/esp_capture: "*"
