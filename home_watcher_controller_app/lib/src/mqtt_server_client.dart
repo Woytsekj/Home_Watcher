@@ -75,8 +75,10 @@ class MqttComms {
     client.pingCallback = ping;
 
     // Set the port
-    client.port =
-      8883; // Secure port number for mosquitto, no client certificate required
+    client.port = 8883; // Secure port number for mosquitto, no client certificate required
+
+    // Set MQTT to auto reconnect
+    client.autoReconnect = true;
 
     // Security context
     // Create the security context
@@ -100,7 +102,7 @@ class MqttComms {
         .withWillMessage('My Will message')
         .startClean() // Non persistent session for testing
         .withWillQos(MqttQos.atLeastOnce);
-    print('EXAMPLE::Mosquitto client connecting....');
+    print('MQTT::Mosquitto client connecting....');
     client.connectionMessage = connMess;
 
     // Connect to the server
@@ -111,14 +113,10 @@ class MqttComms {
     }
 
     /// Subscribe to topic ot posit messages to
-    print('EXAMPLE::Subscribing to the robotCommands topic');
+    print('MQTT::Subscribing to the robotCommands topic');
 
     client.subscribe(topic, MqttQos.atMostOnce);
-    // Setup and connection successful
-    return 0;
-  }
-/*
-  Future<int> testing() async {
+
     /// The client has a change notifier object(see the Observable class) which we then listen to to get
     /// notifications of published updates to each subscribed topic.
     /// In general you should listen here as soon as possible after connecting, you will not receive any
@@ -149,6 +147,13 @@ class MqttComms {
         'EXAMPLE::Published notification:: topic is ${message.variableHeader!.topicName}, with Qos ${message.header!.qos}',
       );
     });
+
+    // Setup and connection successful
+    return 0;
+  }
+/*
+  Future<int> testing() async {
+    
 
     /// Lets publish to our topic
     /// Use the payload builder rather than a raw buffer
@@ -192,51 +197,51 @@ class MqttComms {
 */
   /// The subscribed callback
   void onSubscribed(String topic) {
-    print('EXAMPLE::Subscription confirmed for topic $topic');
+    print('MQTT::Subscription confirmed for topic $topic');
   }
 
   /// The unsolicited disconnect callback
   void onDisconnected() {
-    print('EXAMPLE::OnDisconnected client callback - Client disconnection');
+    print('MQTT::OnDisconnected client callback - Client disconnection');
     if (client.connectionStatus!.disconnectionOrigin ==
         MqttDisconnectionOrigin.solicited) {
-      print('EXAMPLE::OnDisconnected callback is solicited, this is correct');
+      print('MQTT::OnDisconnected callback is solicited, this is correct');
     } else {
       print(
-        'EXAMPLE::OnDisconnected callback is unsolicited or none',
+        'MQTT::OnDisconnected callback is unsolicited or none',
       );
     }
     if (pongCount == 3) {
-      print('EXAMPLE:: Pong count is correct');
+      print('MQTT::Pong count is correct');
     } else {
-      print('EXAMPLE:: Pong count is incorrect, expected 3. actual $pongCount');
+      print('MQTT::Pong count is incorrect, expected 3. actual $pongCount');
     }
     if (pingCount == 3) {
-      print('EXAMPLE:: Ping count is correct');
+      print('MQTT::Ping count is correct');
     } else {
-      print('EXAMPLE:: Ping count is incorrect, expected 3. actual $pingCount');
+      print('MQTT::Ping count is incorrect, expected 3. actual $pingCount');
     }
   }
 
   /// The successful connect callback
   void onConnected() {
     print(
-      'EXAMPLE::OnConnected client callback - Client connection was successful',
+      'MQTT::OnConnected client callback - Client connection was successful',
     );
   }
 
   /// Pong callback
   void pong() {
-    print('EXAMPLE::Ping response client callback invoked');
+    print('MQTT::Ping response client callback invoked');
     pongCount++;
     print(
-      'EXAMPLE::Latency of this ping/pong cycle is ${client.lastCycleLatency} milliseconds',
+      'MQTT::Latency of this ping/pong cycle is ${client.lastCycleLatency} milliseconds',
     );
   }
 
   /// Ping callback
   void ping() {
-    print('EXAMPLE::Ping sent client callback invoked');
+    print('MQTT::Ping sent client callback invoked');
     pingCount++;
   }
 
@@ -245,7 +250,7 @@ class MqttComms {
   {
     final builder = MqttClientPayloadBuilder();
     String message  = commandName;
-    print('Send Command: $commandName');
+    print('MQTT::Send Command: $commandName');
     builder.addString(message);
 
     try
@@ -254,7 +259,7 @@ class MqttComms {
     }
     on Exception catch (e)
     {
-      print("Exception in communication $e");
+      print("MQTT::Exception in communication $e");
     }
   }
 
@@ -267,21 +272,21 @@ class MqttComms {
       await client.connect();
     } on NoConnectionException catch (e) {
       // Raised by the client when connection fails.
-      print('EXAMPLE::client exception - $e');
+      print('MQTT::client exception - $e');
       client.disconnect();
     } on SocketException catch (e) {
       // Raised by the socket layer
-      print('EXAMPLE::socket exception - $e');
+      print('MQTT::socket exception - $e');
       client.disconnect();
     }
 
     /// Check we are connected
     if (client.connectionStatus!.state == MqttConnectionState.connected) {
-      print('EXAMPLE::Mosquitto client connected');
+      print('MQTT::Mosquitto client connected');
     } else {
       /// Use status here rather than state if you also want the broker return code.
       print(
-        'EXAMPLE::ERROR Mosquitto client connection failed - disconnecting, status is ${client.connectionStatus}',
+        'MQTT::ERROR Mosquitto client connection failed - disconnecting, status is ${client.connectionStatus}',
       );
       client.disconnect();
       return -1;
