@@ -56,13 +56,13 @@ class ControlButton extends StatelessWidget {
       case ButtonDirection.cameraUp:
         buttonText = '📷 ^';
         statusText = 'Camera Moving Up';
-        buttonCommand = 'cameraUp';
+        buttonCommand = 'SERVO_UP';
         releaseCommand = 'stopCamera';
 
       case ButtonDirection.cameraDown:
         buttonText = '📷 v';
         statusText = 'Camera Moving Down';
-        buttonCommand = 'cameraDown';
+        buttonCommand = 'SERVO_DOWN';
         releaseCommand = 'stopCamera';
       }
 
