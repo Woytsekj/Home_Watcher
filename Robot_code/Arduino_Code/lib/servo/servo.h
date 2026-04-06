@@ -2,15 +2,15 @@
 #define __SERVO_H__ 
 
 #include <Arduino.h>
-#include <SoftPWM.h>
+#include <Servo.h>
 
-class Servo {
+class MyServo { // Renamed to avoid conflict with the library class name
   private:
     uint8_t pin;
-    uint8_t angle;
+    Servo internalServo; 
 
   public:
-    Servo(uint8_t pin);
+    MyServo(uint8_t pin);
     void attach();
     void write(uint8_t angle);
 };
