@@ -25,8 +25,12 @@ class ImageChangerState extends State<ImageChanger> {
     return Column(
       children: [
         _imageData != null
-            ? Image.memory(_imageData!, fit: BoxFit.contain, width: MediaQuery.sizeOf(context).width, height: MediaQuery.sizeOf(context).height, gaplessPlayback: true)
-            : Text('/n/n/n/n/nNo image loaded'),
+            ? Transform.flip(
+                    // Video Data is flipped vertically, so flip it back
+                    flipY: true,
+                    child: Image.memory(_imageData!, fit: BoxFit.contain, width: MediaQuery.sizeOf(context).width, height: MediaQuery.sizeOf(context).height, gaplessPlayback: true),
+                  )
+            : Text('\n\n\n\n\n\nPlease Wait for Video Feed', textAlign: TextAlign.center),
       ],
     );
   }

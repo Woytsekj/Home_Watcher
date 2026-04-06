@@ -1,5 +1,6 @@
 // Global Packages
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:home_watcher_controller_app/battery_widget.dart';
 import 'package:home_watcher_controller_app/src/signaling.dart';
 import 'package:provider/provider.dart';
@@ -112,10 +113,63 @@ class MyHomePage extends StatelessWidget {
     return result;
   }
 
+
   @override
   Widget build(BuildContext context) {
     ControlState appState = context.watch<ControlState>();
     String movementStatus = appState.current;
+
+    if (appState.keyboardInitialized == false)
+    {
+      appState.initializeKeyboard();
+      bool handleKeyPress(KeyEvent event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            mqttComms.publishCommand('moveForward');
+            appState.setState('Moving Forward');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            mqttComms.publishCommand('moveBackward');
+            appState.setState('Moving Backward');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            mqttComms.publishCommand('turnLeft');
+            appState.setState('Turning Left');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            mqttComms.publishCommand('turnRight');
+            appState.setState('Turning Right');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.keyW) {
+            mqttComms.publishCommand('SERVO_UP');
+            appState.setState('Camera Moving Up');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.keyS) {
+            mqttComms.publishCommand('SERVO_DOWN');
+            appState.setState('Camera Moving Down');
+            return true;
+          }
+        } else if (event is KeyUpEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+              event.logicalKey == LogicalKeyboardKey.arrowDown ||
+              event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+              event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            mqttComms.publishCommand('stop');
+            appState.stopState();
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.keyW ||
+                    event.logicalKey == LogicalKeyboardKey.keyS) {
+            mqttComms.publishCommand('stopCamera');
+            appState.stopState();
+            return true;
+          }
+        }
+        return false;
+      }
+
+      HardwareKeyboard.instance.addHandler(handleKeyPress);
+    }
+    
 
     return Scaffold(
       body: Stack(

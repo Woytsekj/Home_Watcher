@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class ControlState extends ChangeNotifier {
-  var current = 'Waiting for input';
+  String current = 'Waiting for input';
+  bool keyboardInitialized = false;
 
   void setState(String newState) {
     current = newState;
@@ -14,5 +15,10 @@ class ControlState extends ChangeNotifier {
     current = 'Robot Stopped';
     print(current);
     notifyListeners();
+  }
+
+  void initializeKeyboard()
+  {
+    keyboardInitialized = true;
   }
 }

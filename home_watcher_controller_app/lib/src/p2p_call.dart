@@ -136,10 +136,7 @@ class CallSampleState extends State<CallSample> {
                   width: MediaQuery.of(context).size.width,
                   height: MediaQuery.of(context).size.height,
                   decoration: BoxDecoration(color: Colors.black54),
-                  child: Transform.flip(
-                    flipY: true,
-                    child: video,
-                  ),
+                  child: video,
                 );
       });
   }
