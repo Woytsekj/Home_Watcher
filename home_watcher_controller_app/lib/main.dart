@@ -1,14 +1,15 @@
 // Global Packages
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:home_watcher_controller_app/battery_widget.dart';
+import 'package:home_watcher_controller_app/src/signaling.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
-import 'dart:math' as math;
+
 
 // Local Classes
 import 'control_state.dart';
 import 'control_button.dart';
 import 'menu_entry.dart';
-import 'http_comms.dart';
 import 'src/p2p_call.dart';
 import 'src/mqtt_server_client.dart';
 
@@ -26,10 +27,13 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
 
   MqttComms mqttComms = MqttComms();
+  late Signaling signaling;
+
   @override
   void initState() {
     super.initState();
     mqttComms.setupClient();
+    signaling = Signaling(mqttComms);
   }
 
   @override
@@ -41,7 +45,7 @@ class _MyAppState extends State<MyApp> {
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlue),
         ),
-        home: MyHomePage(mqttComms: mqttComms),
+        home: MyHomePage(mqttComms: mqttComms, signaling: signaling),
         debugShowCheckedModeBanner: false,
       ),
     );
@@ -54,9 +58,11 @@ class MyHomePage extends StatelessWidget {
   const MyHomePage({
     super.key,
     required this.mqttComms,
+    required this.signaling,
   });
 
   final MqttComms mqttComms;
+  final Signaling signaling;
 
   List<MenuEntry> _getMenus(ControlState appState) {
     final List<MenuEntry> result = <MenuEntry>[
@@ -85,22 +91,19 @@ class MyHomePage extends StatelessWidget {
             },
           ),
           MenuEntry(
-            label: 'Test Robot Connection',
+            label: 'Send WebRTC Offer',
             onPressed: () async {
-              http.Response response;  
-              appState.setState("Testing Robot Connection");
-              response = await HttpComms.sendCommandProtected('TestConnectionRobot');
-
-              if (response.statusCode == 200)
-              {
-                // Connection successful
-                appState.setState("Robot Connection Successful");
-              }
-              else
-              {
-                // Connection failure
-                appState.setState("Robot Connection Not Successful");
-              }
+              
+              appState.setState("Sending WebRTC Offer");
+              signaling.invite("1");
+            },
+          ),
+          MenuEntry(
+            label: 'Request Battery Level',
+            onPressed: () async {
+              
+              appState.setState("Requesting Battery Level");
+              mqttComms.publishCommand('requestBatteryLevel');
             },
           ),
         ],
@@ -110,15 +113,68 @@ class MyHomePage extends StatelessWidget {
     return result;
   }
 
+
   @override
   Widget build(BuildContext context) {
     ControlState appState = context.watch<ControlState>();
     String movementStatus = appState.current;
 
+    if (appState.keyboardInitialized == false)
+    {
+      appState.initializeKeyboard();
+      bool handleKeyPress(KeyEvent event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            mqttComms.publishCommand('moveForward');
+            appState.setState('Moving Forward');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            mqttComms.publishCommand('moveBackward');
+            appState.setState('Moving Backward');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            mqttComms.publishCommand('turnLeft');
+            appState.setState('Turning Left');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            mqttComms.publishCommand('turnRight');
+            appState.setState('Turning Right');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.keyW) {
+            mqttComms.publishCommand('SERVO_UP');
+            appState.setState('Camera Moving Up');
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.keyS) {
+            mqttComms.publishCommand('SERVO_DOWN');
+            appState.setState('Camera Moving Down');
+            return true;
+          }
+        } else if (event is KeyUpEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+              event.logicalKey == LogicalKeyboardKey.arrowDown ||
+              event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+              event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            mqttComms.publishCommand('stop');
+            appState.stopState();
+            return true;
+          } else if (event.logicalKey == LogicalKeyboardKey.keyW ||
+                    event.logicalKey == LogicalKeyboardKey.keyS) {
+            mqttComms.publishCommand('stopCamera');
+            appState.stopState();
+            return true;
+          }
+        }
+        return false;
+      }
+
+      HardwareKeyboard.instance.addHandler(handleKeyPress);
+    }
+    
+
     return Scaffold(
       body: Stack(
         children: [
-          CallSample(mqttComms),
+          CallSample(signaling),
           //Image(image: AssetImage('pictures/DoggoPic.jpg')),
           Center(
             child: Column(
@@ -151,10 +207,7 @@ class MyHomePage extends StatelessWidget {
             right: 10,
             child: SafeArea
             (
-              child: Transform.rotate(
-                angle: 90 * math.pi / 180,
-                child: Icon(Icons.battery_full, color: Colors.blue, size: 50)
-                )
+              child: BatteryWidget(mqttComms: mqttComms)
             ),
           ),
         ],

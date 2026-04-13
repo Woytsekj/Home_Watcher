@@ -29,10 +29,18 @@ import 'package:flutter/services.dart' show rootBundle;
 
 class MqttComms {
   final client = MqttServerClient('ec2-3-149-184-208.us-east-2.compute.amazonaws.com', 'android');
-  final topic = 'robotCommands';
+  final robotCommandsTopic = 'robotCommands';
+
+  final robotToControllerTopic = 'robotWebRTC/tx';
+  final controllerToRobotTopic = 'robotWebRTC/rx';
+
+  String certString = '';
 
   var pongCount = 0; // Pong counter
   var pingCount = 0; // Ping counter
+
+  Function (String message)? onWebRTCMessageReceived;
+  Function (String message)? onBatteryLevelReceived;
 
   Future<int> setupClient() async {
     /// Set logging on if needed, defaults to off
@@ -85,6 +93,7 @@ class MqttComms {
     final context = SecurityContext.defaultContext;
     // Load and parse Cert
     final ByteData homeWatcherByteData = await rootBundle.load('certs/HomeWatcher.crt');
+    //certString = await rootBundle.loadString('certs/HomeWatcher.crt');
     final homeWatcherCrt = homeWatcherByteData.buffer.asUint8List();
     // Set Cert in context
     context.setTrustedCertificatesBytes(homeWatcherCrt);
@@ -114,8 +123,9 @@ class MqttComms {
 
     /// Subscribe to topic ot posit messages to
     print('MQTT::Subscribing to the robotCommands topic');
-
-    client.subscribe(topic, MqttQos.atMostOnce);
+    client.subscribe(robotCommandsTopic, MqttQos.atMostOnce);
+    client.subscribe(robotToControllerTopic, MqttQos.atMostOnce);
+    client.subscribe(controllerToRobotTopic, MqttQos.atMostOnce);
 
     /// The client has a change notifier object(see the Observable class) which we then listen to to get
     /// notifications of published updates to each subscribed topic.
@@ -134,23 +144,49 @@ class MqttComms {
       /// for a while.
       /// The payload is a byte buffer, this will be specific to the topic
       print(
-        'EXAMPLE::Change notification:: topic is <${c[0].topic}>, payload is <-- $pt -->',
+        'MQTT::Change notification:: topic is <${c[0].topic}>, payload is <-- $pt -->',
       );
-      print('');
+
+      if (c[0].topic == robotToControllerTopic)
+      {
+        print('MQTT::Message received on robotToControllerTopic');
+        // WebRTC message received from the robot, pass to the callback
+        if (onWebRTCMessageReceived != null)
+        {
+          print('MQTT::Passing WebRTC message to callback');
+          onWebRTCMessageReceived!(pt);
+        }
+      } else if (c[0].topic == robotCommandsTopic)
+      {
+        if (pt.startsWith(RegExp(r"^[0-9]*$"))) {
+          print('MQTT::Battery Level Message Received');
+          // Battery level message received from the robot, pass to the callback
+          if (onBatteryLevelReceived != null)
+          {
+            print('MQTT::Passing Battery Level message to callback');
+            onBatteryLevelReceived!(pt);
+          }
+        }
+      }
     });
 
-    /// If needed you can listen for published messages that have completed the publishing
-    /// handshake which is Qos dependant. Any message received on this stream has completed its
-    /// publishing handshake with the broker.
-    client.published!.listen((MqttPublishMessage message) {
-      print(
-        'EXAMPLE::Published notification:: topic is ${message.variableHeader!.topicName}, with Qos ${message.header!.qos}',
-      );
-    });
+
 
     // Setup and connection successful
     return 0;
   }
+
+  /// If needed you can listen for published messages that have completed the publishing
+  /// handshake which is Qos dependant. Any message received on this stream has completed its
+  /// publishing handshake with the broker.
+  /*
+  client.published!.listen((MqttPublishMessage message) {
+    print(
+      'EXAMPLE::Published notification:: topic is ${message.variableHeader!.topicName}, with Qos ${message.header!.qos}',
+    );
+  });
+  */
+
 /*
   Future<int> testing() async {
     
@@ -255,11 +291,29 @@ class MqttComms {
 
     try
     {
+      client.publishMessage(robotCommandsTopic, MqttQos.exactlyOnce, builder.payload!);
+    }
+    on Exception catch (e)
+    {
+      print("MQTT::Exception in command communication $e");
+    }
+  }
+
+
+  // Publish a message to the topic
+  void publishMessage(String topic, String message)
+  {
+    final builder = MqttClientPayloadBuilder();
+    print('MQTT::Send Message: $message to topic: $topic');
+    builder.addString(message);
+
+    try
+    {
       client.publishMessage(topic, MqttQos.exactlyOnce, builder.payload!);
     }
     on Exception catch (e)
     {
-      print("MQTT::Exception in communication $e");
+      print("MQTT::Exception in webRTC communication $e");
     }
   }
 
