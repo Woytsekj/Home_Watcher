@@ -18,4 +18,6 @@ HomeWatcher is a mobile robot platform developed to allow users to remotely obse
 * **PlatformIO:** If you have never used PlatformIO before, download the extension for VScode then download the whole file containing the platform.in and the open it in each respective file to open the whole project for each microcontroller
 * **APP:** If you have an Android device you can download and use the APK. If you dont download the app code and compile it yourself
 
-
+## On First Boot
+The ESP32 on first boot will open its own WiFi and website to input WiFi creds. Go into a webbrowser while connected to the ESP32 and go to 192.168.4.1.
+When the creds are given the ESP32 will reset and try to connect to a MQTT server. To get back to the Web portal, press and hold the boot button until it resets and that will flush the NV memory.
